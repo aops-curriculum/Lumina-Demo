@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Complete the Square Speed Run</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f8f8ff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      margin: 0;
+    }
+    h1 {
+      margin-top: 2rem;
+      margin-bottom: 0.5rem;
+    }
+    .equation {
+      font-size: 2rem;
+      margin: 2rem 0 1rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .input-box {
+      font-size: 1.5rem;
+      width: 5rem;
+      text-align: center;
+      padding: 0.2em 0.5em;
+      border-radius: 0.3em;
+      border: 1px solid #aaa;
+      margin: 0 0.2em;
+    }
+    .timer {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+    }
+    .feedback {
+      font-size: 1.1rem;
+      color: #b00;
+      min-height: 1.5em;
+      margin-bottom: 1rem;
+    }
+    .summary {
+      font-size: 1.3rem;
+      margin-top: 2rem;
+      color: #0a0;
+    }
+    button {
+      font-size: 1rem;
+      padding: 0.5em 1em;
+      border-radius: 0.3em;
+      border: 1px solid #888;
+      background: #e0e0ff;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    button:active {
+      background: #c0c0ff;
+    }
+  </style>
+</head>
+<body>
+  <h1>Complete the Square Speed Run</h1>
+  <div class="timer" id="timer">Time: 0.00 s</div>
+  <div class="equation" id="equation">
+    <!-- Equation will be rendered here -->
+  </div>
+  <div class="feedback" id="feedback"></div>
+  <button id="startBtn">Start Game</button>
+  <div class="summary" id="summary"></div>
+
+  <script>
+    // Utility: parse input as fraction or decimal
+    function parseInput(val) {
+      val = val.trim();
+      if (/^[-+]?\d+\s*\/\s*\d+$/.test(val)) {
+        // Fraction
+        const [num, denom] = val.split("/").map(Number);
+        if (denom === 0) return NaN;
+        return num / denom;
+      } else {
+        // Try as float
+        return parseFloat(val);
+      }
+    }
+
+    // Generate random integer between min and max, inclusive
+    function randomInt(min, max, excludeZero = false) {
+      let n;
+      do {
+        n = Math.floor(Math.random() * (max - min + 1)) + min;
+      } while (excludeZero && n === 0);
+      return n;
+    }
+
+    // State
+    let b = 0;
+    let correctValue = 0;
+    let round = 0;
+    let totalRounds = 5;
+    let timer = null;
+    let startTime = null;
+    let running = false;
+
+    const equationDiv = document.getElementById('equation');
+    const feedbackDiv = document.getElementById('feedback');
+    const timerDiv = document.getElementById('timer');
+    const summaryDiv = document.getElementById('summary');
+    const startBtn = document.getElementById('startBtn');
+
+    function formatFraction(val) {
+      // Try to display as fraction if possible, else decimal
+      if (Number.isInteger(val)) return val;
+      // Try denominator up to 20
+      for (let d = 2; d <= 20; d++) {
+        let n = Math.round(val * d);
+        if (Math.abs(val - n/d) < 1e-8) {
+          return `${n}/${d}`;
+        }
+      }
+      return val.toFixed(3);
+    }
+
+    function renderEquation() {
+      equationDiv.innerHTML = '';
+      // x^2 + bx + [input] = 5 + [auto]
+      const eq = document.createElement('span');
+      eq.textContent = `x² ${b < 0 ? '- ' + Math.abs(b) : '+ ' + b}x +`;
+      equationDiv.appendChild(eq);
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'input-box';
+      input.id = 'userInput';
+      input.setAttribute('autocomplete', 'off');
+      input.setAttribute('aria-label', 'Value to add');
+      equationDiv.appendChild(input);
+      const eq2 = document.createElement('span');
+      eq2.textContent = ' = 5 +';
+      equationDiv.appendChild(eq2);
+      const auto = document.createElement('input');
+      auto.type = 'text';
+      auto.className = 'input-box';
+      auto.id = 'autoBox';
+      auto.setAttribute('readonly', 'readonly');
+      equationDiv.appendChild(auto);
+      // Set up event
+      input.addEventListener('input', (e) => {
+        if (!running) {
+          running = true;
+          startTime = performance.now();
+          updateTimer();
+        }
+        const val = e.target.value;
+        document.getElementById('autoBox').value = val;
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          checkAnswer();
+        }
+      });
+      input.focus();
+    }
+
+    function newRound() {
+      b = randomInt(-10, 10, true);
+      correctValue = (b/2) * (b/2);
+      renderEquation();
+      feedbackDiv.textContent = '';
+    }
+
+    function checkAnswer() {
+      const input = document.getElementById('userInput');
+      const val = input.value;
+      const parsed = parseInput(val);
+      if (isNaN(parsed)) {
+        feedbackDiv.textContent = 'Please enter a valid number or fraction.';
+        return;
+      }
+      if (Math.abs(parsed - correctValue) < 1e-6) {
+        round++;
+        if (round < totalRounds) {
+          feedbackDiv.textContent = 'Correct! Next...';
+          setTimeout(() => {
+            newRound();
+          }, 600);
+        } else {
+          finishGame();
+        }
+      } else {
+        feedbackDiv.textContent = `Incorrect. Try again!`;
+      }
+    }
+
+    function updateTimer() {
+      if (!running) return;
+      const now = performance.now();
+      const elapsed = ((now - startTime) / 1000).toFixed(2);
+      timerDiv.textContent = `Time: ${elapsed} s`;
+      timer = requestAnimationFrame(updateTimer);
+    }
+
+    function finishGame() {
+      running = false;
+      cancelAnimationFrame(timer);
+      const now = performance.now();
+      const elapsed = ((now - startTime) / 1000).toFixed(2);
+      timerDiv.textContent = `Time: ${elapsed} s`;
+      summaryDiv.textContent = `You finished ${totalRounds} rounds in ${elapsed} seconds!`;
+      startBtn.style.display = '';
+      equationDiv.innerHTML = '';
+      feedbackDiv.textContent = '';
+    }
+
+    function startGame() {
+      round = 0;
+      running = false;
+      summaryDiv.textContent = '';
+      startBtn.style.display = 'none';
+      timerDiv.textContent = 'Time: 0.00 s';
+      newRound();
+    }
+
+    startBtn.addEventListener('click', startGame);
+    // Optionally, start on load
+    // startGame();
+  </script>
+</body>
+</html> 

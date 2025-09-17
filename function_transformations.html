@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Function Transformations Interactive</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 {
+            margin-top: 24px;
+            color: #333;
+            text-align: center;
+        }
+        .description {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 16px;
+            line-height: 1.5;
+            max-width: 600px;
+        }
+        #container {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 24px 32px 32px 32px;
+            margin: 32px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .graphs-container {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .graph-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .graph-label {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 18px;
+        }
+        canvas {
+            background: #e9ecef;
+            border: 1px solid #bbb;
+            border-radius: 6px;
+            width: 400px;
+            height: 400px;
+        }
+        .inputs {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #f1f3f4;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .input-group label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .input-group input {
+            width: 60px;
+            text-align: center;
+            border: 1px solid #bbb;
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 16px;
+        }
+        .buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        button {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #feedback {
+            margin-top: 16px;
+            font-size: 1.1em;
+            min-height: 1.5em;
+            text-align: center;
+        }
+        .correct {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .incorrect {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .hint {
+            color: #6c757d;
+            font-style: italic;
+            margin-top: 10px;
+        }
+        /* Remove spinner arrows from number inputs */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            appearance: textfield;
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body>
+    <h1>Function Transformations Interactive</h1>
+    <div class="description">
+        The graph on the left shows f(x). The graph on the right shows a transformation of f(x) in the form a·f(x-h) + k.<br>
+        Determine the values of a, h, and k by comparing the two graphs.
+    </div>
+    
+    <div id="container">
+        <div class="graphs-container">
+            <div class="graph-section">
+                <div class="graph-label">f(x)</div>
+                <canvas id="originalGraph" width="400" height="400"></canvas>
+            </div>
+            <div class="graph-section">
+                <div class="graph-label">a·f(x-h) + k</div>
+                <canvas id="transformedGraph" width="400" height="400"></canvas>
+            </div>
+        </div>
+
+        
+        <div class="inputs">
+            <div class="input-group">
+                <label for="a">a (vertical stretch/compression)</label>
+                <input type="number" id="a" step="any" placeholder="a">
+            </div>
+            <div class="input-group">
+                <label for="h">h (horizontal shift)</label>
+                <input type="number" id="h" step="any" placeholder="h">
+            </div>
+            <div class="input-group">
+                <label for="k">k (vertical shift)</label>
+                <input type="number" id="k" step="any" placeholder="k">
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button id="newProblem">New Problem</button>
+            <button id="checkAnswer">Check Answer</button>
+            <button id="tryAgain" style="display: none;">Try Again</button>
+        </div>
+        
+        <div id="feedback"></div>
+    </div>
+
+    <script>
+        // Canvas setup
+        const originalCanvas = document.getElementById('originalGraph');
+        const transformedCanvas = document.getElementById('transformedGraph');
+        const originalCtx = originalCanvas.getContext('2d');
+        const transformedCtx = transformedCanvas.getContext('2d');
+
+        // Problem state
+        let currentA, currentH, currentK;
+        let originalFunction, transformedFunction;
+        let showingStudentAnswer = false;
+
+        // Fixed function f(x) with horizontal line, semicircle, triangle, and rectangle
+        function generateRandomFunction() {
+            return function(x) {
+                // Base horizontal line at y = 1
+                let y = 1;
+                
+                // Semicircle above the line (centered at x = -5, radius = 2)
+                if (x >= -7 && x <= -3) {
+                    const dx = x - (-5);
+                    const semicircleY = 1 + Math.sqrt(4 - dx * dx);
+                    y = Math.max(y, semicircleY);
+                }
+                
+                // Triangle below the line (centered at x = 0, base width = 3, height = 2)
+                if (x >= -1.5 && x <= 1.5) {
+                    const dx = Math.abs(x);
+                    const triangleY = 1 - 2 * (1 - dx / 1.5);
+                    y = Math.min(y, triangleY);
+                }
+                
+                // Second triangular spike above the line (centered at x = 5, base width = 2, height = 3)
+                if (x >= 4 && x <= 6) {
+                    const dx = Math.abs(x - 5);
+                    const triangleY = 1 + 3 * (1 - dx);
+                    y = Math.max(y, triangleY);
+                }
+                
+                return y;
+            };
+        }
+
+        // Coordinate transformation functions
+        function toCanvasX(x, canvas) {
+            return (x + 10) * canvas.width / 20;
+        }
+
+        function toCanvasY(y, canvas) {
+            return canvas.height - (y + 10) * canvas.height / 20;
+        }
+
+        function fromCanvasX(canvasX, canvas) {
+            return (canvasX * 20 / canvas.width) - 10;
+        }
+
+        function fromCanvasY(canvasY, canvas) {
+            return 10 - (canvasY * 20 / canvas.height);
+        }
+
+        // Draw grid and axes
+        function drawGrid(ctx, canvas) {
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([]); // Reset to solid lines
+            
+            // Vertical grid lines
+            for (let x = -10; x <= 10; x += 2) {
+                const canvasX = toCanvasX(x, canvas);
+                ctx.beginPath();
+                ctx.moveTo(canvasX, 0);
+                ctx.lineTo(canvasX, canvas.height);
+                ctx.stroke();
+            }
+            
+            // Horizontal grid lines
+            for (let y = -10; y <= 10; y += 2) {
+                const canvasY = toCanvasY(y, canvas);
+                ctx.beginPath();
+                ctx.moveTo(0, canvasY);
+                ctx.lineTo(canvas.width, canvasY);
+                ctx.stroke();
+            }
+            
+            // Axes
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            
+            // X-axis
+            ctx.beginPath();
+            ctx.moveTo(0, toCanvasY(0, canvas));
+            ctx.lineTo(canvas.width, toCanvasY(0, canvas));
+            ctx.stroke();
+            
+            // Y-axis
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(0, canvas), 0);
+            ctx.lineTo(toCanvasX(0, canvas), canvas.height);
+            ctx.stroke();
+            
+            // Tick marks and labels
+            ctx.fillStyle = '#333';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            
+            // X-axis tick marks and labels
+            for (let x = -10; x <= 10; x += 2) {
+                const canvasX = toCanvasX(x, canvas);
+                const canvasY = toCanvasY(0, canvas);
+                
+                // Tick mark
+                ctx.beginPath();
+                ctx.moveTo(canvasX, canvasY - 5);
+                ctx.lineTo(canvasX, canvasY + 5);
+                ctx.stroke();
+                
+                // Label
+                ctx.fillText(x.toString(), canvasX, canvasY + 20);
+            }
+            
+            // Y-axis tick marks and labels
+            ctx.textAlign = 'right';
+            for (let y = -10; y <= 10; y += 2) {
+                const canvasX = toCanvasX(0, canvas);
+                const canvasY = toCanvasY(y, canvas);
+                
+                // Tick mark
+                ctx.beginPath();
+                ctx.moveTo(canvasX - 5, canvasY);
+                ctx.lineTo(canvasX + 5, canvasY);
+                ctx.stroke();
+                
+                // Label
+                ctx.fillText(y.toString(), canvasX - 10, canvasY + 4);
+            }
+        }
+
+        // Draw function
+        function drawFunction(ctx, canvas, func, color = '#007bff', dashed = false, bold = false) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = bold ? 6 : 3;
+            if (dashed) {
+                ctx.setLineDash([10, 5]);
+            } else {
+                ctx.setLineDash([]);
+            }
+            ctx.beginPath();
+            
+            let firstPoint = true;
+            let lastValidY = null;
+            
+            for (let i = 0; i <= canvas.width; i++) {
+                const x = fromCanvasX(i, canvas);
+                const y = func(x);
+                
+                if (y >= -15 && y <= 15) { // Clamp to reasonable range
+                    const canvasY = toCanvasY(y, canvas);
+                    if (firstPoint) {
+                        ctx.moveTo(i, canvasY);
+                        firstPoint = false;
+                    } else {
+                        // Connect to previous point if it was valid
+                        if (lastValidY !== null) {
+                            ctx.lineTo(i, canvasY);
+                        } else {
+                            ctx.moveTo(i, canvasY);
+                        }
+                    }
+                    lastValidY = canvasY;
+                } else {
+                    lastValidY = null;
+                }
+            }
+            ctx.stroke();
+        }
+
+        // Generate new problem
+        function generateNewProblem() {
+            // Generate random transformation parameters
+            currentA = Math.floor(Math.random() * 5) - 2; // -2 to 2
+            while (currentA === 0) currentA = Math.floor(Math.random() * 5) - 2;
+            
+            currentH = Math.floor(Math.random() * 5) - 2; // -2 to 2
+            
+            currentK = Math.floor(Math.random() * 5) - 2; // -2 to 2
+            
+            // Generate original function
+            originalFunction = generateRandomFunction();
+            
+            // Create transformed function
+            transformedFunction = function(x) {
+                return currentA * originalFunction(x - currentH) + currentK;
+            };
+            
+            // Clear inputs
+            document.getElementById('a').value = '';
+            document.getElementById('h').value = '';
+            document.getElementById('k').value = '';
+            document.getElementById('feedback').textContent = '';
+            document.getElementById('tryAgain').style.display = 'none';
+            showingStudentAnswer = false;
+            
+            // Draw graphs
+            drawGraphs();
+        }
+
+        // Draw both graphs
+        function drawGraphs() {
+            // Clear and draw original graph
+            originalCtx.clearRect(0, 0, originalCanvas.width, originalCanvas.height);
+            drawGrid(originalCtx, originalCanvas);
+            drawFunction(originalCtx, originalCanvas, originalFunction, '#007bff');
+            
+            // Clear and draw transformed graph
+            transformedCtx.clearRect(0, 0, transformedCanvas.width, transformedCanvas.height);
+            drawGrid(transformedCtx, transformedCanvas);
+            drawFunction(transformedCtx, transformedCanvas, transformedFunction, '#51cf66', false, false);
+        }
+
+        // Check answer
+        function checkAnswer() {
+            const userA = parseFloat(document.getElementById('a').value);
+            const userH = parseFloat(document.getElementById('h').value);
+            const userK = parseFloat(document.getElementById('k').value);
+            
+            if (isNaN(userA) || isNaN(userH) || isNaN(userK)) {
+                document.getElementById('feedback').textContent = 'Please enter all three values.';
+                document.getElementById('feedback').className = 'incorrect';
+                return;
+            }
+            
+            const aCorrect = Math.abs(userA - currentA) < 0.01;
+            const hCorrect = Math.abs(userH - currentH) < 0.01;
+            const kCorrect = Math.abs(userK - currentK) < 0.01;
+            
+            if (aCorrect && hCorrect && kCorrect) {
+                document.getElementById('feedback').textContent = 'Correct! Well done!';
+                document.getElementById('feedback').className = 'correct';
+                document.getElementById('tryAgain').style.display = 'none';
+                showingStudentAnswer = false;
+                
+                // Show bold green graph when correct
+                transformedCtx.clearRect(0, 0, transformedCanvas.width, transformedCanvas.height);
+                drawGrid(transformedCtx, transformedCanvas);
+                drawFunction(transformedCtx, transformedCanvas, transformedFunction, '#51cf66', false, true);
+            } else {
+                document.getElementById('feedback').textContent = 'Incorrect. Try again!';
+                document.getElementById('feedback').className = 'incorrect';
+                
+                // Show student's answer overlaid on the right graph
+                showStudentAnswerOverlay(userA, userH, userK);
+            }
+        }
+
+        // Show student's answer overlaid on the right graph
+        function showStudentAnswerOverlay(userA, userH, userK) {
+            // Create student's function
+            const studentFunction = function(x) {
+                return userA * originalFunction(x - userH) + userK;
+            };
+            
+            // Redraw the right graph with both correct and student answers
+            transformedCtx.clearRect(0, 0, transformedCanvas.width, transformedCanvas.height);
+            drawGrid(transformedCtx, transformedCanvas);
+            
+            // Draw correct answer (green)
+            drawFunction(transformedCtx, transformedCanvas, transformedFunction, '#51cf66');
+            
+            // Draw student's answer (red dashed line)
+            drawFunction(transformedCtx, transformedCanvas, studentFunction, '#ff6b6b', true);
+            
+            // Show try again button
+            document.getElementById('tryAgain').style.display = 'inline-block';
+            showingStudentAnswer = true;
+        }
+
+
+
+        // Try again function
+        function tryAgain() {
+            // Clear inputs
+            document.getElementById('a').value = '';
+            document.getElementById('h').value = '';
+            document.getElementById('k').value = '';
+            document.getElementById('feedback').textContent = '';
+            document.getElementById('tryAgain').style.display = 'none';
+            
+            // Redraw the right graph with only the correct answer
+            drawGraphs();
+            showingStudentAnswer = false;
+        }
+
+        // Event listeners
+        document.getElementById('newProblem').addEventListener('click', generateNewProblem);
+        document.getElementById('checkAnswer').addEventListener('click', checkAnswer);
+        document.getElementById('tryAgain').addEventListener('click', tryAgain);
+
+        // Allow Enter key to submit
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        // Initialize
+        generateNewProblem();
+    </script>
+</body>
+</html> 

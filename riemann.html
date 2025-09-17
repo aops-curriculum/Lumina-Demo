@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Riemann Sum Explorer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6fa;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.04);
+    }
+    
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+    }
+    
+    .control-section {
+      flex: 1;
+      min-width: 200px;
+    }
+    
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+    
+    p {
+      margin: 0;
+      font-size: 14px;
+      color: #333;
+    }
+    
+    select, input[type=range] {
+      margin-top: 5px;
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      font-size: 14px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    
+    input[type=range] {
+      width: 100%;
+      padding: 0;
+      border: none;
+      background: transparent;
+    }
+    
+    label {
+      font-weight: 500;
+      color: #333;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    
+    .checkbox-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 5px;
+    }
+    
+    input[type=checkbox] {
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Riemann Sum Explorer</h1>
+    
+    <div class="controls">
+      <div class="control-section">
+        <label for="rectSlider">Number of rectangles:</label>
+        <input type="range" id="rectSlider" min="1" max="100" value="1" step="1">
+        <p id="rectValue">1</p>
+        
+        <label for="aSlider">Left bound (a):</label>
+        <input type="range" id="aSlider" min="0" max="4" value="1" step="0.1">
+        <p id="aValue">1.00</p>
+        
+        <label for="bSlider">Right bound (b):</label>
+        <input type="range" id="bSlider" min="1" max="4" value="3" step="0.1">
+        <p id="bValue">3.00</p>
+      </div>
+      
+      <div class="control-section">
+        <label for="funcSelect">Function:</label>
+        <select id="funcSelect">
+          <option value="x²">x²</option>
+          <option value="15sin(x)">15sin(x)</option>
+          <option value="e^x">e^x</option>
+          <option value="10ln(x + 1)">10ln(x + 1)</option>
+          <option value="tan(x)">tan(x)</option>
+          <option value="1/√|x-2|">1/√|x-2|</option>
+        </select>
+        
+        <label for="sumSelect">Sum type:</label>
+        <select id="sumSelect">
+          <option value="Left">Left</option>
+          <option value="Right">Right</option>
+          <option value="Midpoint">Midpoint</option>
+        </select>
+        
+        <div class="checkbox-container">
+          <input type="checkbox" id="showTrueArea">
+          <label for="showTrueArea">Show true area under curve</label>
+        </div>
+        
+        <p id="trueAreaP"></p>
+      </div>
+    </div>
+    
+    <p id="areaP"></p>
+  </div>
+
+<script>
+let slider, aSlider, bSlider, areaP;
+let funcSelect, sumSelect;
+let selectedFunction, selectedFuncName, sumType;
+let showTrueArea; // Add variable for true area toggle
+let trueAreaP; // Add variable for true area display
+let aValueSpan, bValueSpan;
+
+let functions = {
+  "x²": {
+    f: x => x * x,
+    F: x => x * x * x / 3 // antiderivative
+  },
+  "15sin(x)": {
+    f: x => 15 * Math.sin(x),
+    F: x => -15 * Math.cos(x) // antiderivative
+  },
+  "e^x": {
+    f: x => Math.exp(x),
+    F: x => Math.exp(x) // antiderivative
+  },
+  "10ln(x + 1)": {
+    f: x => 10 * Math.log(x + 1),
+    F: x => 10 * ((x + 1) * Math.log(x + 1) - (x + 1)) // antiderivative
+  },
+  "tan(x)": {
+    f: x => Math.tan(x),
+    F: x => -Math.log(Math.abs(Math.cos(x))) // antiderivative
+  },
+  "1/√|x-2|": {
+    f: x => 1 / Math.sqrt(Math.abs(x-2)),
+    F: x => 2 * Math.sqrt(Math.abs(x-2)) * Math.sign(x-2) // antiderivative
+  }
+};
+
+function setup() {
+  createCanvas(600, 400);
+
+  // Get HTML elements
+  slider = document.getElementById('rectSlider');
+  aSlider = document.getElementById('aSlider');
+  bSlider = document.getElementById('bSlider');
+  funcSelect = document.getElementById('funcSelect');
+  sumSelect = document.getElementById('sumSelect');
+  showTrueArea = document.getElementById('showTrueArea');
+  areaP = document.getElementById('areaP');
+  trueAreaP = document.getElementById('trueAreaP');
+  
+  // Add event listeners
+  slider.addEventListener('input', updateValues);
+  aSlider.addEventListener('input', updateValues);
+  bSlider.addEventListener('input', updateValues);
+  funcSelect.addEventListener('change', changeFunction);
+  sumSelect.addEventListener('change', changeSumType);
+  showTrueArea.addEventListener('change', () => {});
+  
+  // Initialize values
+  selectedFuncName = "x²";
+  selectedFunction = functions[selectedFuncName];
+  sumType = "Left";
+  updateValues();
+}
+
+function updateValues() {
+  document.getElementById('rectValue').textContent = slider.value;
+  document.getElementById('aValue').textContent = parseFloat(aSlider.value).toFixed(2);
+  document.getElementById('bValue').textContent = parseFloat(bSlider.value).toFixed(2);
+}
+
+function changeFunction() {
+  selectedFuncName = funcSelect.value;
+  selectedFunction = functions[selectedFuncName];
+}
+
+function changeSumType() {
+  sumType = sumSelect.value;
+}
+
+function draw() {
+  background(255);
+
+  const numRects = slider.value;
+  let a = aSlider.value;
+  let b = bSlider.value;
+  if (a >= b) a = b - 0.01;
+  a = constrain(a, 0, 4);
+  b = constrain(b, 0.01, 4); // b must be at least > 0 for rendering
+
+  drawAxes(); // Fixed axes
+
+  // Calculate true area
+  const trueArea = calculateTrueArea(a, b);
+
+  // Draw true area under curve first (if enabled)
+  if (showTrueArea.checked) {
+    drawTrueArea(a, b);
+  }
+
+  const dx = (b - a) / numRects;
+  let totalArea = 0;
+  stroke(0);
+  fill(173, 216, 230, 180);
+
+  for (let i = 0; i < numRects; i++) {
+    let x;
+    if (sumType === "Left") x = a + i * dx;
+    else if (sumType === "Right") x = a + (i + 1) * dx;
+    else if (sumType === "Midpoint") x = a + (i + 0.5) * dx;
+
+    let y = selectedFunction.f(x);
+    if (!isFinite(y)) continue;
+
+    let px = map(x - (sumType === "Right" ? dx : (sumType === "Midpoint" ? dx / 2 : 0)), 0, 4, 50, width - 50);
+    let y0 = map(0, -10, 16, height - 50, 50);
+    let yTop = map(y, -10, 16, height - 50, 50);
+    let rectW = map(dx, 0, 4, 0, width - 100);
+    let rectH = y0 - yTop;
+
+    rect(px, min(y0, yTop), rectW, abs(rectH));
+    totalArea += y * dx;
+  }
+
+  drawFunction(a, b);
+  drawABMarkers(a, b);
+
+  // Update displays
+  areaP.innerHTML =
+    `Function: ${selectedFuncName}<br>` +
+    `Sum type: ${sumType}<br>` +
+    `Number of rectangles: ${numRects}<br>` +
+    `Approximate area: ${isFinite(totalArea) ? totalArea.toFixed(4) : "undefined"}`;
+
+  // Update a and b values in their labels
+  // aValueSpan.html(a.toFixed(2)); // This line is removed as aValueSpan is no longer used
+  // bValueSpan.html(b.toFixed(2)); // This line is removed as bValueSpan is no longer used
+
+  // Only show true area and error when checkbox is checked
+  if (showTrueArea.checked) {
+    trueAreaP.innerHTML =
+      `True area: ${isFinite(trueArea) ? trueArea.toFixed(4) : "undefined"}<br>` +
+      `Error: ${isFinite(trueArea) && isFinite(totalArea) ? Math.abs(totalArea - trueArea).toFixed(4) : "undefined"}`;
+    trueAreaP.style.display = 'block'; // Ensure it's visible
+  } else {
+    trueAreaP.style.display = 'none'; // Hide it
+  }
+}
+
+function drawFunction(a = 0, b = 4) {
+  stroke(255, 0, 0);
+  noFill();
+  beginShape();
+  let prevY = null;
+
+  for (let x = 0; x <= 4; x += 0.01) {
+    let yVal = selectedFunction.f(x);
+
+    if (!isFinite(yVal) || Math.abs(yVal) > 100) {
+      endShape();
+      beginShape();
+      prevY = null;
+      continue;
+    }
+
+    if (prevY !== null && Math.abs(yVal - prevY) > 20) {
+      endShape();
+      beginShape();
+    }
+
+    let px = map(x, 0, 4, 50, width - 50);
+    let py = map(yVal, -10, 16, height - 50, 50);
+    vertex(px, py);
+    prevY = yVal;
+  }
+
+  endShape();
+}
+
+function drawAxes() {
+  stroke(0);
+
+  // Properly place the x-axis at y = 0
+  let yZero = map(0, -10, 16, height - 50, 50);
+  line(50, yZero, width - 50, yZero); // x-axis
+  line(50, height - 50, 50, 50);      // y-axis
+
+  // X-axis ticks
+  for (let i = 0; i <= 4; i++) {
+    let x = map(i, 0, 4, 50, width - 50);
+    line(x, yZero - 5, x, yZero + 5);
+    textAlign(CENTER, TOP);
+    text(i, x, yZero + 8);
+  }
+
+  // Y-axis ticks
+  for (let i = -10; i <= 16; i += 4) {
+    let y = map(i, -10, 16, height - 50, 50);
+    line(45, y, 55, y);
+    textAlign(RIGHT, CENTER);
+    text(i, 45, y);
+  }
+}
+
+function drawABMarkers(a, b) {
+  let ax = map(a, 0, 4, 50, width - 50);
+  let bx = map(b, 0, 4, 50, width - 50);
+  let yZero = map(0, -10, 16, height - 50, 50);
+  let ay = map(selectedFunction.f(a), -10, 16, height - 50, 50);
+  let by = map(selectedFunction.f(b), -10, 16, height - 50, 50);
+
+  stroke('#0074D9');
+  line(ax, yZero, ax, ay);
+  fill('#0074D9');
+  textAlign(CENTER, BOTTOM);
+  text('a', ax, min(yZero, ay) - 5);
+
+  stroke('#FF4136');
+  line(bx, yZero, bx, by);
+  fill('#FF4136');
+  textAlign(CENTER, BOTTOM);
+  text('b', bx, min(yZero, by) - 5);
+}
+
+function drawTrueArea(a, b) {
+  // Draw the filled area under the curve between a and b
+  fill(255, 255, 0, 100); // Semi-transparent yellow
+  stroke(255, 215, 0); // Gold stroke
+  strokeWeight(1);
+  
+  beginShape();
+  
+  // Start at the left bound on the x-axis
+  let ax = map(a, 0, 4, 50, width - 50);
+  let yZero = map(0, -10, 16, height - 50, 50);
+  vertex(ax, yZero);
+  
+  // Draw the curve from a to b
+  for (let x = a; x <= b; x += 0.01) {
+    let yVal = selectedFunction.f(x);
+    
+    if (!isFinite(yVal) || Math.abs(yVal) > 100) {
+      // Skip this point if function is undefined
+      continue;
+    }
+    
+    let px = map(x, 0, 4, 50, width - 50);
+    let py = map(yVal, -10, 16, height - 50, 50);
+    vertex(px, py);
+  }
+  
+  // End at the right bound on the x-axis
+  let bx = map(b, 0, 4, 50, width - 50);
+  vertex(bx, yZero);
+  
+  endShape(CLOSE);
+}
+
+function calculateTrueArea(a, b) {
+  try {
+    // Check for improper integrals
+    if (selectedFuncName === "tan(x)") {
+      // Check if the interval contains π/2 or 3π/2 where tan(x) has vertical asymptotes
+      const pi2 = Math.PI / 2;
+      const pi32 = 3 * Math.PI / 2;
+      
+      if ((a < pi2 && b > pi2) || (a < pi32 && b > pi32)) {
+        return NaN; // Improper integral doesn't converge
+      }
+    }
+    
+    return selectedFunction.F(b) - selectedFunction.F(a);
+  } catch (e) {
+    return NaN;
+  }
+}
+</script>
+</body>
+</html>

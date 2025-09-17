@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mean Value Theorem – Guess Mode</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6fa;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.04);
+    }
+    
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+    
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #007bff;
+      color: white;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    
+    button:hover {
+      background: #0056b3;
+    }
+    
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+    
+    select {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      font-size: 14px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    
+    label {
+      font-weight: 500;
+      color: #333;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Mean Value Theorem – Student Guess Mode</h2>
+    
+    <div class="controls">
+      <div class="control-group">
+        <label for="funcSelect">Choose a function:</label>
+        <select id="funcSelect">
+          <option value="cubic">f(x) = x³ - x</option>
+          <option value="sine">f(x) = 10sin(x)</option>
+          <option value="cosx2">f(x) = 10cos(x²)</option>
+          <option value="gaussianSine">f(x) = 10e^(-x²)·sin(2x)</option>
+          <option value="absolute">f(x) = 5|x - 0.5|</option>
+        </select>
+      </div>
+      
+      <button id="randomizeBtn">Randomize A and B</button>
+      <button id="lockBtn">Lock in A and B</button>
+      <button id="tryCBtn" disabled>Try C</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+<script>
+let f, df;
+let xMin = -3, xMax = 3, yMin = -11, yMax = 11;
+let pointA = { x: -1 }, pointB = { x: 1 }, pointC = { x: 0 };
+let userChoice = { x: 0 }; // Store user's original choice
+let correctAnswer = { x: 0 }; // Store the correct answer
+let draggingA = false, draggingB = false, draggingC = false;
+let isLockedAB = false;
+let isLockedC = false;
+let showFeedback = false;
+const radius = 8;
+const MATCH_THRESHOLD = 0.1;
+
+let leftHeld = false;
+let rightHeld = false;
+let lastMoveTime = 0;
+const MOVE_INTERVAL = 50; // Faster response time (was 100)
+
+// UI elements
+let funcSelect, lockBtn, tryCBtn, resetBtn, randomizeBtn;
+let currentFunction = 'cubic';
+
+const functions = {
+  cubic: {
+    f: x => x ** 3 - x,
+    df: x => 3 * x ** 2 - 1
+  },
+  sine: {
+    f: x => 10 * Math.sin(x),
+    df: x => 10 * Math.cos(x)
+  },
+  cosx2: {
+    f: x => 10 * Math.cos(x ** 2),
+    df: x => -20 * x * Math.sin(x ** 2)
+  },
+  gaussianSine: {
+    f: x => 10 * Math.exp(-(x ** 2)) * Math.sin(2 * x),
+    df: x => 10 * Math.exp(-(x ** 2)) * (2 * Math.cos(2 * x) - 2 * x * Math.sin(2 * x))
+  },
+  absolute: {
+    f: x => 5 * Math.abs(x - 0.5),
+    df: x => x < 0.5 ? -5 : 5
+  }
+};
+
+function setup() {
+  createCanvas(800, 600);
+  textSize(12);
+  
+  // Get HTML elements
+  funcSelect = document.getElementById('funcSelect');
+  lockBtn = document.getElementById('lockBtn');
+  tryCBtn = document.getElementById('tryCBtn');
+  resetBtn = document.getElementById('resetBtn');
+  randomizeBtn = document.getElementById('randomizeBtn');
+  
+  // Add event listeners
+  funcSelect.addEventListener('change', changeFunction);
+  lockBtn.addEventListener('click', lockAB);
+  tryCBtn.addEventListener('click', tryC);
+  resetBtn.addEventListener('click', resetAll);
+  randomizeBtn.addEventListener('click', randomizePoints);
+  
+  // Initialize function
+  f = functions[currentFunction].f;
+  df = functions[currentFunction].df;
+}
+
+function changeFunction() {
+  currentFunction = funcSelect.value;
+  f = functions[currentFunction].f;
+  df = functions[currentFunction].df;
+  resetAll();
+}
+
+function lockAB() {
+  isLockedAB = true;
+  pointC.x = (pointA.x + pointB.x) / 2;
+  tryCBtn.removeAttribute('disabled');
+}
+
+function tryC() {
+  // Store user's current choice
+  userChoice.x = pointC.x;
+  
+  // Activate feedback mode
+  showFeedback = true;
+  isLockedC = false;
+  tryCBtn.removeAttribute('disabled');
+  
+  // Calculate secant slope
+  const secantSlope = (f(pointB.x) - f(pointA.x)) / (pointB.x - pointA.x);
+  
+  // Check if Mean Value Theorem applies (for absolute value function)
+  let mvtApplies = true;
+  if (currentFunction === 'absolute') {
+    // Check if A and B span across the corner at x = 0.5
+    if ((pointA.x < 0.5 && pointB.x > 0.5) || (pointA.x > 0.5 && pointB.x < 0.5)) {
+      mvtApplies = false;
+    }
+  }
+  
+  if (mvtApplies) {
+    // Find the correct position but don't move C
+    correctAnswer.x = findExactPosition(pointA.x, pointB.x, secantSlope);
+  } else {
+    // Mean Value Theorem doesn't apply
+    correctAnswer.x = null;
+  }
+  
+  // Auto-lock since we've found the correct answer
+  isLockedC = true;
+  tryCBtn.setAttribute('disabled', true);
+}
+
+function resetAll() {
+  isLockedAB = false;
+  isLockedC = false;
+  showFeedback = false;
+  pointA.x = -1;
+  pointB.x = 1;
+  pointC.x = 0;
+  tryCBtn.setAttribute('disabled', true);
+}
+
+function draw() {
+  background(255);
+
+  const now = millis();
+  const step = 0.0005; // Much smaller steps for very precise control
+
+  // Calculate secant slope early so we can use it in movement logic
+  const secantSlope = (f(pointB.x) - f(pointA.x)) / (pointB.x - pointA.x);
+
+  if (isLockedAB && !isLockedC && now - lastMoveTime > MOVE_INTERVAL) {
+    // Check if C is already at the correct position
+    const slopeAtC = df(pointC.x);
+    const slopeDiff = slopeAtC - secantSlope;
+    const absDiff = Math.abs(slopeDiff);
+    const isMatch = absDiff < MATCH_THRESHOLD;
+    
+    if (leftHeld) {
+      if (isMatch) {
+        // Snap to exact position when close
+        const newX = findExactPosition(pointA.x, pointB.x, secantSlope);
+        pointC.x = newX;
+      } else {
+        pointC.x = max(pointA.x, pointC.x - step);
+      }
+      lastMoveTime = now;
+    }
+    if (rightHeld) {
+      if (isMatch) {
+        // Snap to exact position when close
+        const newX = findExactPosition(pointA.x, pointB.x, secantSlope);
+        pointC.x = newX;
+      } else {
+        pointC.x = min(pointB.x, pointC.x + step);
+      }
+      lastMoveTime = now;
+    }
+  }
+
+  drawAxes();
+
+  const ax = graphToScreenX(pointA.x);
+  const ay = graphToScreenY(f(pointA.x));
+  const bx = graphToScreenX(pointB.x);
+  const by = graphToScreenY(f(pointB.x));
+
+  // Function curve
+  noFill(); stroke(0);
+  beginShape();
+  for (let x = xMin; x <= xMax; x += 0.01) {
+    const y = f(x);
+    if (isFinite(y)) vertex(graphToScreenX(x), graphToScreenY(y));
+  }
+  endShape();
+
+  // Secant + A, B
+  stroke(0, 0, 255);
+  line(ax, ay, bx, by);
+  noStroke(); fill(0);
+  ellipse(ax, ay, radius);
+  ellipse(bx, by, radius);
+  drawLabel(ax, ay, `A`);
+  drawLabel(bx, by, `B`);
+
+  if (isLockedAB) {
+    const cx = graphToScreenX(pointC.x);
+    const fc = f(pointC.x);
+    const cy = graphToScreenY(fc);
+    fill(100);
+    ellipse(cx, cy, radius * 1.2);
+    drawLabel(cx, cy, `C`);
+
+    const slopeAtC = df(pointC.x);
+    const dx = 0.75;
+
+    // Always show tangent while dragging/moving C
+    stroke(150);
+    line(graphToScreenX(pointC.x - dx), graphToScreenY(fc - slopeAtC * dx),
+         graphToScreenX(pointC.x + dx), graphToScreenY(fc + slopeAtC * dx));
+
+    // Show correct answer if feedback is active
+    if (showFeedback) {
+      if (correctAnswer.x !== null) {
+        const correctCx = graphToScreenX(correctAnswer.x);
+        const correctFc = f(correctAnswer.x);
+        const correctCy = graphToScreenY(correctFc);
+        
+        // Draw correct answer in green
+        fill(0, 200, 0);
+        ellipse(correctCx, correctCy, radius * 1.2);
+        drawLabel(correctCx, correctCy, `C*`);
+        
+        const correctSlopeAtC = df(correctAnswer.x);
+        stroke(color(0, 200, 0));
+        line(graphToScreenX(correctAnswer.x - dx), graphToScreenY(correctFc - correctSlopeAtC * dx),
+             graphToScreenX(correctAnswer.x + dx), graphToScreenY(correctFc + correctSlopeAtC * dx));
+        
+        // Calculate how close user was to correct answer
+        const userSlope = df(userChoice.x);
+        const userDiff = Math.abs(userSlope - secantSlope);
+        const correctDiff = Math.abs(correctSlopeAtC - secantSlope);
+        
+        // Show feedback about user's choice
+        fill(0);
+        text(`Your choice: slope = ${userSlope.toFixed(2)}, diff = ${userDiff.toFixed(2)}`, 10, 120);
+        text(`Correct answer: slope = ${correctSlopeAtC.toFixed(2)}, diff = ${correctDiff.toFixed(2)}`, 10, 140);
+        
+        if (userDiff < 0.1) {
+          fill(0, 150, 0);
+          text("Great job! You were very close!", 10, 160);
+        } else if (userDiff < 0.5) {
+          fill(255, 165, 0);
+          text("Not bad! You were getting close.", 10, 160);
+        } else {
+          fill(255, 0, 0);
+          text("Try again! You were quite far off.", 10, 160);
+        }
+        
+        // Show secant slope
+        fill(0);
+        text(`Secant slope: ${secantSlope.toFixed(2)}`, 10, 180);
+      } else {
+        // Mean Value Theorem doesn't apply
+        fill(255, 0, 0);
+        text("Uh oh! Not differentiable!", 10, 120);
+        fill(0);
+        text("The Mean Value Theorem doesn't apply here because", 10, 140);
+        text("the function is not differentiable on the interval.", 10, 160);
+        text("Try choosing different points A and B.", 10, 180);
+      }
+    }
+  }
+}
+
+function keyPressed() {
+  if (keyCode === LEFT_ARROW) leftHeld = true;
+  if (keyCode === RIGHT_ARROW) rightHeld = true;
+}
+
+function keyReleased() {
+  if (keyCode === LEFT_ARROW) leftHeld = false;
+  if (keyCode === RIGHT_ARROW) rightHeld = false;
+}
+
+function drawAxes() {
+  stroke(180);
+  const zeroX = graphToScreenX(0);
+  const zeroY = graphToScreenY(0);
+  line(graphToScreenX(xMin), zeroY, graphToScreenX(xMax), zeroY);
+  line(zeroX, graphToScreenY(yMin), zeroX, graphToScreenY(yMax));
+
+  push();
+  fill(0); noStroke(); textAlign(CENTER, CENTER);
+  for (let i = Math.ceil(xMin); i <= Math.floor(xMax); i++) {
+    const x = graphToScreenX(i);
+    text(i, x, zeroY + 15);
+    stroke(200);
+    line(x, zeroY - 5, x, zeroY + 5);
+  }
+  for (let j = Math.ceil(yMin); j <= Math.floor(yMax); j++) {
+    const y = graphToScreenY(j);
+    text(j, zeroX - 20, y);
+    stroke(200);
+    line(zeroX - 5, y, zeroX + 5, y);
+  }
+  text("x", width - 20, zeroY - 10);
+  text("y", zeroX + 10, 10);
+  pop();
+}
+
+function drawLabel(x, y, txt) {
+  push();
+  fill(0); textAlign(LEFT, BOTTOM);
+  text(txt, x + 5, y - 5);
+  pop();
+}
+
+function graphToScreenX(x) {
+  return map(x, xMin, xMax, 0, width);
+}
+function graphToScreenY(y) {
+  return map(y, yMin, yMax, height, 0);
+}
+function screenToGraphX(x) {
+  return map(x, 0, width, xMin, xMax);
+}
+
+function mousePressed() {
+  const mx = mouseX, my = mouseY;
+
+  if (!isLockedAB) {
+    const ax = graphToScreenX(pointA.x);
+    const ay = graphToScreenY(f(pointA.x));
+    const bx = graphToScreenX(pointB.x);
+    const by = graphToScreenY(f(pointB.x));
+    if (dist(mx, my, ax, ay) < radius) draggingA = true;
+    if (dist(mx, my, bx, by) < radius) draggingB = true;
+  } else if (!isLockedC) {
+    const cx = graphToScreenX(pointC.x);
+    const cy = graphToScreenY(f(pointC.x));
+    if (dist(mx, my, cx, cy) < radius * 1.5) draggingC = true;
+  }
+}
+
+function mouseDragged() {
+  const gx = screenToGraphX(constrain(mouseX, 0, width));
+  const fy = f(gx);
+  const sy = graphToScreenY(fy);
+  if (sy < 0 || sy > height) return;
+
+  if (!isLockedAB) {
+    if (draggingA) pointA.x = constrain(gx, xMin, pointB.x - 0.1);
+    if (draggingB) pointB.x = constrain(gx, pointA.x + 0.1, xMax);
+  } else if (!isLockedC && draggingC) {
+    pointC.x = constrain(gx, pointA.x, pointB.x);
+  }
+}
+
+function mouseReleased() {
+  draggingA = draggingB = draggingC = false;
+}
+
+function randomizePoints() {
+  // Generate two random points with proper spacing
+  let a = random(xMin + 0.5, xMax - 1.5);
+  let b = random(a + 0.5, xMax - 0.5);
+  
+  pointA.x = a;
+  pointB.x = b;
+  pointC.x = (pointA.x + pointB.x) / 2;
+  
+  // Reset game state
+  isLockedAB = false;
+  isLockedC = false;
+  showFeedback = false;
+  tryCBtn.setAttribute('disabled', true);
+}
+
+function findExactPosition(a, b, targetSlope) {
+  // Use binary search to find the exact position
+  let left = a;
+  let right = b;
+  let bestX = (a + b) / 2;
+  let bestDiff = Math.abs(df(bestX) - targetSlope);
+  
+  for (let i = 0; i < 200; i++) { // More iterations for precision
+    const mid = (left + right) / 2;
+    const slopeAtMid = df(mid);
+    const diff = slopeAtMid - targetSlope;
+    const absDiff = Math.abs(diff);
+    
+    if (absDiff < bestDiff) {
+      bestDiff = absDiff;
+      bestX = mid;
+    }
+    
+    if (absDiff < 0.0001) { // Much more precise
+      return mid;
+    }
+    
+    if (diff > 0) {
+      right = mid;
+    } else {
+      left = mid;
+    }
+  }
+  
+  return bestX;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Midpoint Challenge</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    h1 {
+      margin-top: 24px;
+      color: #333;
+    }
+    #mode-selector {
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    #mode-selector select {
+      padding: 8px 12px;
+      font-size: 1rem;
+      border: 1px solid #bbb;
+      border-radius: 5px;
+      background: #fff;
+      cursor: pointer;
+    }
+    #container {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 24px 32px 32px 32px;
+      margin: 32px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #graph {
+      background: #e9ecef;
+      border: 1px solid #bbb;
+      margin-bottom: 20px;
+      border-radius: 6px;
+    }
+    .inputs {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+    .point-input {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f1f3f4;
+      padding: 10px 16px;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .point-input label {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .point-input input {
+      width: 36px;
+      margin: 0 2px;
+      text-align: center;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      padding: 2px 4px;
+    }
+    .number-line-input {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f1f3f4;
+      padding: 10px 16px;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .number-line-input label {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .number-line-input input {
+      width: 60px;
+      text-align: center;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      padding: 4px 8px;
+    }
+    #randomize, #submit, #reveal-answer {
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 8px 18px;
+      font-size: 1rem;
+      margin: 0 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #randomize:hover, #submit:hover, #reveal-answer:hover {
+      background: #0056b3;
+    }
+    #reveal-answer {
+      background: #6c757d;
+    }
+    #reveal-answer:hover {
+      background: #545b62;
+    }
+    #feedback {
+      margin-top: 16px;
+      font-size: 1.1em;
+      min-height: 1.5em;
+    }
+    .correct {
+      color: #28a745;
+      font-weight: bold;
+    }
+    .incorrect {
+      color: #dc3545;
+      font-weight: bold;
+    }
+    /* Remove spinner arrows from number inputs (for browsers that ignore type=text) */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Midpoint Challenge</h1>
+  <div id="mode-selector">
+    <select id="mode-select">
+      <option value="number-line">Number line</option>
+      <option value="coordinate-plane">Coordinate plane</option>
+    </select>
+  </div>
+  <div id="number-line-instructions" style="max-width: 500px; text-align: center; margin-bottom: 10px; font-size: 1.08em; color: #333;">
+    Given two points on a number line, find their midpoint.
+  </div>
+  <div id="coordinate-plane-instructions" class="hidden" style="max-width: 500px; text-align: center; margin-bottom: 10px; font-size: 1.08em; color: #333;">
+    Given points A, B, and C, compute and enter the midpoints D (of AB), E (of BC), and F (of AC).
+  </div>
+  <div id="container">
+    <canvas id="graph" width="400" height="400"></canvas>
+    <div id="abc-readout" style="margin-bottom: 12px; font-size: 1.08em; color: #007bff; text-align: center;"></div>
+    <div style="margin-bottom: 10px;">
+      <button id="randomize">Randomize</button>
+      <button id="reveal-answer" class="hidden">Reveal Answer</button>
+    </div>
+    <form id="guess-form" autocomplete="off">
+      <div id="coordinate-inputs" class="inputs hidden">
+        <div class="point-input">
+          <label for="dx">D (x, y)</label>
+          <div>
+            <input type="text" id="dx" required inputmode="numeric"> ,
+            <input type="text" id="dy" required inputmode="numeric">
+          </div>
+        </div>
+        <div class="point-input">
+          <label for="ex">E (x, y)</label>
+          <div>
+            <input type="text" id="ex" required inputmode="numeric"> ,
+            <input type="text" id="ey" required inputmode="numeric">
+          </div>
+        </div>
+        <div class="point-input">
+          <label for="fx">F (x, y)</label>
+          <div>
+            <input type="text" id="fx" required inputmode="numeric"> ,
+            <input type="text" id="fy" required inputmode="numeric">
+          </div>
+        </div>
+      </div>
+      <div id="number-line-inputs" class="inputs">
+        <div class="number-line-input">
+          <label for="midpoint">Midpoint</label>
+          <input type="text" id="midpoint" inputmode="numeric">
+        </div>
+      </div>
+      <div style="text-align: center;">
+        <button type="button" id="plotD" class="hidden">Plot D</button>
+        <button type="button" id="plotE" class="hidden">Plot E</button>
+        <button type="button" id="plotF" class="hidden">Plot F</button>
+        <button type="submit" id="submit">Submit Guess</button>
+      </div>
+    </form>
+    <div id="feedback"></div>
+  </div>
+  <script>
+    // --- Utility functions ---
+    function midpoint(p1, p2) {
+      return [ (p1[0]+p2[0])/2, (p1[1]+p2[1])/2 ];
+    }
+    function pointsEqual(p1, p2) {
+      return p1[0] === p2[0] && p1[1] === p2[1];
+    }
+    function numberLineMidpoint(p1, p2) {
+      return (p1 + p2) / 2;
+    }
+    // --- State ---
+    let A, B, C, D, E, F;
+    let studentD, studentE, studentF;
+    let pointA, pointB, correctMidpoint; // For number line mode
+    let currentMode = 'number-line';
+    let answersRevealed = false;
+    let allCorrect = false;
+    // --- Canvas setup ---
+    const canvas = document.getElementById('graph');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    // Center origin: grid from -5 to 5
+    const gridMin = -5, gridMax = 5;
+    const gridStep = 1;
+    // --- Coordinate transforms ---
+    function toCanvas([x, y]) {
+      // Map (gridMin,gridMin)-(gridMax,gridMax) to (30, H-30)-(W-30, 30)
+      const pad = 30;
+      const scale = (W-2*pad)/(gridMax-gridMin);
+      return [pad + (x-gridMin)*scale, H - (pad + (y-gridMin)*scale)];
+    }
+    function toCanvasNumberLine(x) {
+      // Map number line from -10 to 10 to canvas width
+      const pad = 30;
+      const scale = (canvas.width-2*pad)/20; // 20 units from -10 to 10
+      return pad + (x+10)*scale;
+    }
+    // --- Random lattice point ---
+    function randomLatticePoint() {
+      // Avoid points too close to edge for better visuals
+      const min = -4, max = 4;
+      return [
+        Math.floor(Math.random()*(max-min+1))+min,
+        Math.floor(Math.random()*(max-min+1))+min
+      ];
+    }
+    function randomNumberLinePoint() {
+      // Random point between -10 and 10
+      return Math.floor(Math.random()*21) - 10;
+    }
+    function formatCoord(val) {
+      // Show .5 if needed, otherwise integer
+      return Number.isInteger(val) ? val : val.toFixed(1);
+    }
+    // --- Randomize problem ---
+    function randomizeProblem() {
+      // Reset flags
+      answersRevealed = false;
+      allCorrect = false;
+      
+      if (currentMode === 'number-line') {
+        randomizeNumberLineProblem();
+      } else {
+        randomizeCoordinateProblem();
+      }
+    }
+    function randomizeNumberLineProblem() {
+      pointA = randomNumberLinePoint();
+      pointB = randomNumberLinePoint();
+      correctMidpoint = numberLineMidpoint(pointA, pointB);
+      clearInputs();
+      draw();
+      document.getElementById('feedback').textContent = '';
+      updateABCReadout();
+    }
+    function randomizeCoordinateProblem() {
+      // Ensure A, B, C are distinct lattice points
+      do {
+        A = randomLatticePoint();
+        B = randomLatticePoint();
+        C = randomLatticePoint();
+      } while (
+        (pointsEqual(A,B) || pointsEqual(B,C) || pointsEqual(A,C))
+      );
+      D = midpoint(A,B);
+      E = midpoint(B,C);
+      F = midpoint(A,C);
+      clearInputs();
+      draw();
+      document.getElementById('feedback').textContent = '';
+      updateABCReadout();
+    }
+    // --- Draw grid, points, and lines ---
+    function draw() {
+      ctx.clearRect(0,0,W,H);
+      
+      if (currentMode === 'number-line') {
+        drawNumberLine();
+      } else {
+        drawCoordinatePlane();
+      }
+    }
+    function drawNumberLine() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const centerY = canvas.height / 2;
+      
+      // Draw number line
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(30, centerY);
+      ctx.lineTo(canvas.width-30, centerY);
+      ctx.stroke();
+      
+      // Draw tick marks and labels
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 1;
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      for (let i = -10; i <= 10; i++) {
+        const x = toCanvasNumberLine(i);
+        const tickHeight = i % 5 === 0 ? 15 : 8;
+        
+        // Draw tick mark
+        ctx.beginPath();
+        ctx.moveTo(x, centerY - tickHeight);
+        ctx.lineTo(x, centerY + tickHeight);
+        ctx.stroke();
+        
+        // Draw label for major ticks
+        if (i % 5 === 0) {
+          ctx.fillStyle = '#333';
+          ctx.fillText(i, x, centerY + 25);
+        }
+      }
+      
+      // Draw points A and B
+      const xA = toCanvasNumberLine(pointA);
+      const xB = toCanvasNumberLine(pointB);
+      
+      // Point A
+      ctx.beginPath();
+      ctx.arc(xA, centerY, 8, 0, 2*Math.PI);
+      ctx.fillStyle = '#007bff';
+      ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Label A
+      ctx.font = 'bold 16px Arial';
+      ctx.fillStyle = '#222';
+      ctx.fillText(`A (${pointA})`, xA, centerY - 25);
+
+       // Label B
+       ctx.fillText(`B (${pointB})`, xB, centerY - 25);
+      
+      // Point B
+      ctx.beginPath();
+      ctx.arc(xB, centerY, 8, 0, 2*Math.PI);
+      ctx.fillStyle = '#007bff';
+      ctx.fill();
+      ctx.stroke();
+      
+     
+      
+      // Draw student's midpoint if provided
+      const midpointInput = document.getElementById('midpoint').value.trim();
+      if (midpointInput && !isNaN(Number(midpointInput))) {
+        const studentMidpoint = parseFloat(midpointInput);
+        const xMid = toCanvasNumberLine(studentMidpoint);
+        
+        ctx.beginPath();
+        ctx.arc(xMid, centerY, 6, 0, 2*Math.PI);
+        ctx.fillStyle = studentMidpoint === correctMidpoint ? '#28a745' : '#dc3545';
+        ctx.globalAlpha = 0.7;
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        ctx.font = 'bold 14px Arial';
+        ctx.fillStyle = '#222';
+        ctx.fillText(`M (${studentMidpoint})`, xMid, centerY - 25);
+      }
+    }
+    function drawCoordinatePlane() {
+      // Draw grid
+      ctx.strokeStyle = '#bbb';
+      ctx.lineWidth = 1;
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for(let i=gridMin;i<=gridMax;i+=gridStep) {
+        // vertical
+        let [x0,y0] = toCanvas([i,gridMin]);
+        let [x1,y1] = toCanvas([i,gridMax]);
+        ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+        // Label x-axis
+        if(i !== 0) {
+          ctx.fillStyle = '#666';
+          ctx.fillText(i, x0, toCanvas([0,0])[1]+16);
+        }
+        // horizontal
+        [x0,y0] = toCanvas([gridMin,i]);
+        [x1,y1] = toCanvas([gridMax,i]);
+        ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+        // Label y-axis
+        if(i !== 0) {
+          ctx.fillStyle = '#666';
+          ctx.fillText(i, toCanvas([0,0])[0]-16, y0);
+        }
+      }
+      // Draw axes
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 2;
+      // x-axis
+      let [x0,y0] = toCanvas([gridMin,0]);
+      let [x1,y1] = toCanvas([gridMax,0]);
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+      // y-axis
+      [x0,y0] = toCanvas([0,gridMin]);
+      [x1,y1] = toCanvas([0,gridMax]);
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+      // Draw A, B, C (given)
+      drawPoint(A, 'A', '#007bff');
+      drawPoint(B, 'B', '#007bff');
+      drawPoint(C, 'C', '#007bff');
+      
+      // Draw line segments between A, B, and C
+      ctx.strokeStyle = '#007bff';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6;
+      
+      // Draw segment AB
+      const [ax, ay] = toCanvas(A);
+      const [bx, by] = toCanvas(B);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+      
+      // Draw segment BC
+      const [cx, cy] = toCanvas(C);
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+      
+      // Draw segment AC
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+      
+      ctx.globalAlpha = 1.0;
+      
+      // Draw student guesses if present
+      if(studentD) {
+        drawPoint(studentD, 'D', pointsEqual(studentD,D)?'#28a745':'#dc3545', true);
+      }
+      if(studentE) {
+        drawPoint(studentE, 'E', pointsEqual(studentE,E)?'#28a745':'#dc3545', true);
+      }
+      if(studentF) {
+        drawPoint(studentF, 'F', pointsEqual(studentF,F)?'#28a745':'#dc3545', true);
+      }
+      
+      // Draw segments between D, E, F if all answers are correct
+      if(allCorrect && studentD && studentE && studentF) {
+        ctx.strokeStyle = '#28a745';
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.6;
+        
+        // Draw segment DE
+        const [dx, dy] = toCanvas(studentD);
+        const [ex, ey] = toCanvas(studentE);
+        ctx.beginPath();
+        ctx.moveTo(dx, dy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        
+        // Draw segment EF
+        const [fx, fy] = toCanvas(studentF);
+        ctx.beginPath();
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(fx, fy);
+        ctx.stroke();
+        
+        // Draw segment DF
+        ctx.beginPath();
+        ctx.moveTo(dx, dy);
+        ctx.lineTo(fx, fy);
+        ctx.stroke();
+        
+        ctx.globalAlpha = 1.0;
+      }
+    }
+    function drawPoint([x,y], label, color, isGuess) {
+      const [cx,cy] = toCanvas([x,y]);
+      // Draw smaller circle
+      ctx.beginPath();
+      ctx.arc(cx,cy,6,0,2*Math.PI);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = isGuess ? 0.5 : 1.0;
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Label with name and coordinates, always visible
+      ctx.font = 'bold 14px Arial';
+      ctx.fillStyle = '#222';
+      let labelText = `${label} (${formatCoord(x)},${formatCoord(y)})`;
+      // Default label offset
+      let offsetX = 10, offsetY = -18;
+      // Adjust if near right edge
+      if (cx > W - 60) offsetX = -60;
+      // Adjust if near left edge
+      if (cx < 60) offsetX = 10;
+      // Adjust if near top
+      if (cy < 30) offsetY = 20;
+      // Adjust if near bottom
+      if (cy > H - 30) offsetY = -20;
+      ctx.fillText(labelText, cx + offsetX, cy + offsetY);
+    }
+    // --- Input handling ---
+    function clearInputs() {
+      if (currentMode === 'number-line') {
+        document.getElementById('midpoint').value = '';
+      } else {
+        ['dx','dy','ex','ey','fx','fy'].forEach(id => {
+          document.getElementById(id).value = '';
+        });
+        studentD = studentE = studentF = null;
+        allCorrect = false;
+      }
+    }
+    function updateABCReadout() {
+      if (currentMode === 'number-line') {
+        document.getElementById('abc-readout').textContent = `Point A: ${pointA}   Point B: ${pointB}`;
+      } else {
+        const aStr = `A: (${A[0]}, ${A[1]})`;
+        const bStr = `B: (${B[0]}, ${B[1]})`;
+        const cStr = `C: (${C[0]}, ${C[1]})`;
+        document.getElementById('abc-readout').textContent = `${aStr}   ${bStr}   ${cStr}`;
+      }
+    }
+    function switchMode(mode) {
+      currentMode = mode;
+      
+      // Update canvas size based on mode
+      const canvas = document.getElementById('graph');
+      if (mode === 'number-line') {
+        canvas.width = 600;
+        canvas.height = 200;
+      } else {
+        canvas.width = 400;
+        canvas.height = 400;
+      }
+      
+      // Update UI visibility
+      const numberLineElements = ['number-line-instructions', 'number-line-inputs'];
+      const coordinateElements = ['coordinate-plane-instructions', 'coordinate-inputs', 'plotD', 'plotE', 'plotF'];
+      
+      if (mode === 'number-line') {
+        numberLineElements.forEach(id => document.getElementById(id).classList.remove('hidden'));
+        coordinateElements.forEach(id => document.getElementById(id).classList.add('hidden'));
+        
+        // Remove required from coordinate inputs when hidden
+        ['dx', 'dy', 'ex', 'ey', 'fx', 'fy'].forEach(id => {
+          document.getElementById(id).removeAttribute('required');
+        });
+        
+        // Hide reveal answer button in number line mode
+        document.getElementById('reveal-answer').classList.add('hidden');
+      } else {
+        numberLineElements.forEach(id => document.getElementById(id).classList.add('hidden'));
+        coordinateElements.forEach(id => document.getElementById(id).classList.remove('hidden'));
+        
+        // Add required back to coordinate inputs when visible
+        ['dx', 'dy', 'ex', 'ey', 'fx', 'fy'].forEach(id => {
+          document.getElementById(id).setAttribute('required', '');
+        });
+        
+        // Show reveal answer button in coordinate plane mode
+        document.getElementById('reveal-answer').classList.remove('hidden');
+      }
+      
+      // Randomize problem for new mode
+      randomizeProblem();
+    }
+    document.getElementById('mode-select').onchange = function() {
+      switchMode(this.value);
+    };
+    document.getElementById('randomize').onclick = randomizeProblem;
+    document.getElementById('reveal-answer').onclick = function() {
+      if (currentMode === 'coordinate-plane') {
+        answersRevealed = true;
+        studentD = D;
+        studentE = E;
+        studentF = F;
+        allCorrect = true; // Set this to true so segments will be drawn
+        draw();
+        document.getElementById('feedback').innerHTML = '<span class="incorrect">Answers revealed. D: (' + formatCoord(D[0]) + ', ' + formatCoord(D[1]) + '), E: (' + formatCoord(E[0]) + ', ' + formatCoord(E[1]) + '), F: (' + formatCoord(F[0]) + ', ' + formatCoord(F[1]) + ')</span>';
+      }
+    };
+    document.getElementById('submit').onclick = function(e) {
+      e.preventDefault();
+      console.log('Submit button clicked, current mode:', currentMode);
+      console.log('Raw input value:', document.getElementById('midpoint').value);
+      const guess = getStudentInputs();
+      console.log('Guess:', guess);
+      console.log('Guess type:', typeof guess);
+      console.log('Guess === 0:', guess === 0);
+      console.log('Guess == 0:', guess == 0);
+      if (!guess && guess !== 0) {
+        if (currentMode === 'number-line') {
+          document.getElementById('feedback').innerHTML = '<span class="incorrect">Please enter a valid midpoint.</span>';
+        } else {
+          document.getElementById('feedback').innerHTML = '<span class="incorrect">Please enter valid coordinates for all midpoints.</span>';
+        }
+        return;
+      }
+      
+      if (currentMode === 'number-line') {
+        console.log('Giving number line feedback for:', guess);
+        giveNumberLineFeedback(guess);
+      } else {
+        [studentD, studentE, studentF] = guess;
+        draw();
+        giveCoordinateFeedback();
+      }
+      updateABCReadout();
+    };
+    function getStudentInputs() {
+      if (currentMode === 'number-line') {
+        const midpointInput = document.getElementById('midpoint').value.trim();
+        console.log('midpointInput:', midpointInput);
+        console.log('parseFloat result:', parseFloat(midpointInput));
+        console.log('isNaN result:', isNaN(parseFloat(midpointInput)));
+        
+        if (midpointInput === '0') {
+          console.log('Special case: input is 0, returning 0');
+          return 0;
+        }
+        
+        if (midpointInput === '' || isNaN(parseFloat(midpointInput))) {
+          console.log('Returning null due to validation failure');
+          return null;
+        }
+        const result = parseFloat(midpointInput);
+        console.log('Returning result:', result);
+        return result;
+      } else {
+        // Returns [D, E, F] as arrays of numbers, or null if any are invalid
+        const dx = document.getElementById('dx').value.trim();
+        const dy = document.getElementById('dy').value.trim();
+        const ex = document.getElementById('ex').value.trim();
+        const ey = document.getElementById('ey').value.trim();
+        const fx = document.getElementById('fx').value.trim();
+        const fy = document.getElementById('fy').value.trim();
+        if ([dx, dy, ex, ey, fx, fy].some(v => v === '' || isNaN(Number(v)))) {
+          return null;
+        }
+        return [
+          [parseFloat(dx), parseFloat(dy)],
+          [parseFloat(ex), parseFloat(ey)],
+          [parseFloat(fx), parseFloat(fy)]
+        ];
+      }
+    }
+    function getSingleInput(xId, yId) {
+      const x = document.getElementById(xId).value.trim();
+      const y = document.getElementById(yId).value.trim();
+      if (x === '' || y === '' || isNaN(Number(x)) || isNaN(Number(y))) {
+        return null;
+      }
+      return [parseFloat(x), parseFloat(y)];
+    }
+    document.getElementById('plotD').onclick = function() {
+      const d = getSingleInput('dx', 'dy');
+      if (!d) return;
+      studentD = d;
+      draw();
+      document.getElementById('feedback').textContent = '';
+      updateABCReadout();
+    };
+    document.getElementById('plotE').onclick = function() {
+      const e = getSingleInput('ex', 'ey');
+      if (!e) return;
+      studentE = e;
+      draw();
+      document.getElementById('feedback').textContent = '';
+      updateABCReadout();
+    };
+    document.getElementById('plotF').onclick = function() {
+      const f = getSingleInput('fx', 'fy');
+      if (!f) return;
+      studentF = f;
+      draw();
+      document.getElementById('feedback').textContent = '';
+      updateABCReadout();
+    };
+    document.getElementById('guess-form').onsubmit = function(e) {
+      e.preventDefault();
+      console.log('Form submitted, current mode:', currentMode);
+      const guess = getStudentInputs();
+      console.log('Guess:', guess);
+      if (!guess) {
+        if (currentMode === 'number-line') {
+          document.getElementById('feedback').innerHTML = '<span class="incorrect">Please enter a valid midpoint.</span>';
+        } else {
+          document.getElementById('feedback').innerHTML = '<span class="incorrect">Please enter valid coordinates for all midpoints.</span>';
+        }
+        return;
+      }
+      
+      if (currentMode === 'number-line') {
+        console.log('Giving number line feedback for:', guess);
+        giveNumberLineFeedback(guess);
+      } else {
+        [studentD, studentE, studentF] = guess;
+        draw();
+        giveCoordinateFeedback();
+      }
+      updateABCReadout();
+    };
+    function giveNumberLineFeedback(studentMidpoint) {
+      console.log('giveNumberLineFeedback called with:', studentMidpoint);
+      console.log('correctMidpoint:', correctMidpoint);
+      draw(); // Redraw to show the student's point
+      if (Math.abs(studentMidpoint - correctMidpoint) < 0.001) {
+        document.getElementById('feedback').innerHTML = '<span class="correct">Correct! Well done!</span>';
+      } else {
+        document.getElementById('feedback').innerHTML = '<span class="incorrect">Incorrect. Try again!</span>';
+      }
+    }
+    function giveCoordinateFeedback() {
+      let correctD = pointsEqual(studentD, D);
+      let correctE = pointsEqual(studentE, E);
+      let correctF = pointsEqual(studentF, F);
+      let msg = '';
+      if(correctD && correctE && correctF) {
+        msg = '<span class="correct">All correct! Well done!</span>';
+        allCorrect = true;
+      } else {
+        msg = '<span class="incorrect">';
+        msg += 'D: ' + (correctD ? '✔️' : '❌') + ' ';
+        msg += 'E: ' + (correctE ? '✔️' : '❌') + ' ';
+        msg += 'F: ' + (correctF ? '✔️' : '❌');
+        msg += '</span>';
+        allCorrect = false;
+      }
+      document.getElementById('feedback').innerHTML = msg;
+    }
+    // --- Initialize ---
+    switchMode('number-line');
+  </script>
+</body>
+</html> 

@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epsilon-Delta Game (p5.js)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f4f6fa;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.04);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .instructions {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .instructions h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .instructions p {
+            margin: 10px 0;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .instructions ol {
+            padding-left: 20px;
+        }
+        
+        .instructions li {
+            margin: 5px 0;
+            color: #333;
+        }
+        
+        .instructions strong {
+            color: #007bff;
+        }
+        
+        #game-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 600px;
+        }
+        
+        canvas {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Epsilon-Delta Game</h1>
+        
+        <div class="instructions">
+            <h2>How to Play</h2>
+            <p><strong>Goal:</strong> Find the largest δ (delta) value that still satisfies the epsilon-delta definition of continuity at x = 0.</p>
+            <ol>
+                <li>Click <strong>"Draw Challenge"</strong> to get a new function and ε value</li>
+                <li>Click a <strong>δ card</strong> to select it (it will highlight in blue)</li>
+                <li>Click <strong>"Submit δ"</strong> to submit your selected card</li>
+                <li>The player with the <strong>larger valid δ</strong> wins the round</li>
+                <li>Each player starts with 6 cards - use them strategically!</li>
+            </ol>
+            <p><strong>Strategy:</strong> Larger δ values are better, but they must still be mathematically valid. Save your best cards for the right moment!</p>
+            <p><strong>Shortcuts:</strong> Press 'D' to draw challenge, 'N' for next round.</p>
+        </div>
+        
+        <div id="game-container">
+            <!-- p5.js canvas will be inserted here -->
+        </div>
+    </div>
+    
+    <script>
+        // Colors and utilities
+        const Colors = {
+            PRIMARY: '#4285f4',
+            SECONDARY: '#34a853',
+            ERROR: '#ea4335',
+            WARNING: '#fbbc04',
+            SUCCESS: '#34a853',
+            BACKGROUND: '#f8f9fa',
+            CARD_BG: '#ffffff',
+            PANEL_BG: '#e8f0fe',
+            GRID: '#e0e0e0',
+            AXES: '#333333',
+            FUNCTION: '#1976d2',
+            EPSILON_BAND: '#4caf50',
+            DELTA_INTERVAL: '#ff9800',
+            POINT_MARKER: '#e91e63',
+            TEXT: '#333333',
+            TEXT_LIGHT: '#666666',
+            TEXT_WHITE: '#ffffff',
+            HOVER: '#e3f2fd',
+            SELECTED: '#2196f3',
+            DISABLED: '#bdbdbd'
+        };
+
+        const ColorUtils = {
+            hexToRgb: function(hex) {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? [
+                    parseInt(result[1], 16),
+                    parseInt(result[2], 16),
+                    parseInt(result[3], 16)
+                ] : null;
+            },
+            
+            withAlpha: function(colorHex, alpha) {
+                const rgb = this.hexToRgb(colorHex);
+                return rgb ? `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})` : colorHex;
+            },
+            
+            apply: function(colorHex, alpha = 1) {
+                const rgb = this.hexToRgb(colorHex);
+                if (rgb) {
+                    return color(rgb[0], rgb[1], rgb[2], alpha * 255);
+                }
+                return color(colorHex);
+            }
+        };
+
+        // Mathematical utilities
+        const MathUtils = {
+            sampleFunction: function(func, xMin, xMax, numPoints = 200) {
+                const points = [];
+                const dx = (xMax - xMin) / (numPoints - 1);
+                
+                for (let i = 0; i < numPoints; i++) {
+                    const x = xMin + i * dx;
+                    try {
+                        const y = func(x);
+                        if (isFinite(y)) {
+                            points.push({ x, y });
+                        }
+                    } catch (e) {
+                        // Skip points where function is undefined
+                    }
+                }
+                
+                return points;
+            },
+            
+            checkContinuity: function(func, c, epsilon, deltaFunc) {
+                try {
+                    const delta = deltaFunc(epsilon);
+                    if (delta <= 0 || !isFinite(delta)) return false;
+                    
+                    const fc = func(c);
+                    if (!isFinite(fc)) return false;
+                    
+                    // Check multiple points in the delta interval
+                    const numChecks = 20;
+                    for (let i = 0; i < numChecks; i++) {
+                        const t = (i / (numChecks - 1)) * 2 - 1; // t from -1 to 1
+                        const x = c + t * delta * 0.99; // Stay slightly inside delta interval
+                        
+                        try {
+                            const fx = func(x);
+                            if (!isFinite(fx)) continue;
+                            
+                            if (Math.abs(fx - fc) >= epsilon) {
+                                return false;
+                            }
+                        } catch (e) {
+                            return false;
+                        }
+                    }
+                    
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            },
+            
+            generateFunction: function(type) {
+                switch (type) {
+                    case 'linear':
+                        return {
+                            f: (x) => x,
+                            description: 'f(x) = x'
+                        };
+                        
+                    case 'quadratic':
+                        return {
+                            f: (x) => x * x,
+                            description: 'f(x) = x²'
+                        };
+                        
+                    case 'exponential':
+                        return {
+                            f: (x) => Math.exp(x),
+                            description: 'f(x) = eˣ'
+                        };
+                        
+                    case 'sine':
+                        return {
+                            f: (x) => Math.sin(x),
+                            description: 'f(x) = sin(x)'
+                        };
+                        
+                    default:
+                        return this.generateFunction('linear');
+                }
+            },
+            
+            round: function(num, decimals = 2) {
+                return Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
+            },
+            
+            clamp: function(value, min, max) {
+                return Math.min(Math.max(value, min), max);
+            }
+        };
+
+        // Card data generation
+        const CardData = {
+            generateChallenge: function() {
+                const functionTypes = ['linear', 'quadratic', 'exponential', 'sine'];
+                const functionType = functionTypes[Math.floor(Math.random() * functionTypes.length)];
+                
+                const funcData = MathUtils.generateFunction(functionType);
+                const c = 0; // Always at x = 0
+                const epsilon = Math.random() * 0.3 + 0.1; // Epsilon between 0.1 and 0.4
+                
+                return {
+                    f: funcData.f,
+                    functionDescription: funcData.description,
+                    c: c,
+                    epsilon: epsilon,
+                    type: 'challenge'
+                };
+            },
+            
+            generateDeltaDeck: function() {
+                const cards = [];
+                
+                // All delta functions without type categorization
+                cards.push(
+                    { name: 'Equal Delta', description: 'δ(ε) = ε', delta: (epsilon) => epsilon },
+                    { name: 'Half Delta', description: 'δ(ε) = ε/2', delta: (epsilon) => epsilon / 2 },
+                    { name: 'Quarter Delta', description: 'δ(ε) = ε/4', delta: (epsilon) => epsilon / 4 },
+                    { name: 'Square Root', description: 'δ(ε) = √ε', delta: (epsilon) => Math.sqrt(epsilon) },
+                    { name: 'Root Half', description: 'δ(ε) = √(ε/2)', delta: (epsilon) => Math.sqrt(epsilon / 2) },
+                    { name: 'Tiny Constant', description: 'δ(ε) = 0.01', delta: (epsilon) => 0.01 },
+                    { name: 'Small Constant', description: 'δ(ε) = 0.1', delta: (epsilon) => 0.1 },
+                    { name: 'Logarithmic', description: 'δ(ε) = ln(1+ε)', delta: (epsilon) => Math.log(1 + epsilon) },
+                    { name: 'Double Delta', description: 'δ(ε) = 2ε', delta: (epsilon) => 2 * epsilon },
+                    { name: 'Cubic Root', description: 'δ(ε) = ∛ε', delta: (epsilon) => Math.pow(epsilon, 1/3) },
+                    { name: 'Squared', description: 'δ(ε) = ε²', delta: (epsilon) => epsilon * epsilon },
+                    { name: 'Ultra Safe', description: 'δ(ε) = ε/10', delta: (epsilon) => epsilon / 10 },
+                    { name: 'Micro Delta', description: 'δ(ε) = ε/100', delta: (epsilon) => epsilon / 100 },
+                    { name: 'Bold Delta', description: 'δ(ε) = 3ε', delta: (epsilon) => 3 * epsilon },
+                    { name: 'Fifth Root', description: 'δ(ε) = ε^(1/5)', delta: (epsilon) => Math.pow(epsilon, 1/5) }
+                );
+                
+                return cards;
+            }
+        };
+
+        // Deck management
+        class Deck {
+            constructor(cards = []) {
+                this.cards = [...cards];
+                this.discardPile = [];
+                this.originalCards = [...cards];
+            }
+            
+            shuffle() {
+                for (let i = this.cards.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
+                }
+                return this;
+            }
+            
+            draw() {
+                if (this.cards.length === 0) {
+                    if (this.discardPile.length > 0) {
+                        this.shuffleDiscardBack();
+                        return this.draw();
+                    }
+                    return null;
+                }
+                return this.cards.pop();
+            }
+            
+            shuffleDiscardBack() {
+                this.cards.push(...this.discardPile);
+                this.discardPile = [];
+                this.shuffle();
+            }
+            
+            size() {
+                return this.cards.length;
+            }
+        }
+
+        // Card class
+        class Card {
+            constructor(cardData, x = 0, y = 0, width = 90, height = 70) {
+                this.cardData = cardData;
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.isSelected = false;
+                this.isHovered = false;
+                this.scale = 1.0;
+                this.targetScale = 1.0;
+                this.animationSpeed = 0.1;
+            }
+            
+            update() {
+                this.scale = lerp(this.scale, this.targetScale, this.animationSpeed);
+                this.isHovered = this.isMouseOver();
+                
+                if (this.isSelected) {
+                    this.targetScale = 1.1;
+                } else if (this.isHovered) {
+                    this.targetScale = 1.05;
+                } else {
+                    this.targetScale = 1.0;
+                }
+            }
+            
+            draw() {
+                push();
+                
+                translate(this.x + this.width/2, this.y + this.height/2);
+                scale(this.scale);
+                translate(-this.width/2, -this.height/2);
+                
+                // All cards use the same white background
+                if (this.isSelected) {
+                    fill(ColorUtils.apply(Colors.SELECTED, 0.9));
+                    stroke(ColorUtils.apply(Colors.PRIMARY));
+                } else if (this.isHovered) {
+                    fill(ColorUtils.apply(Colors.HOVER));
+                    stroke(ColorUtils.apply(Colors.PRIMARY, 0.7));
+                } else {
+                    fill(ColorUtils.apply(Colors.CARD_BG));
+                    stroke(ColorUtils.apply(Colors.TEXT, 0.3));
+                }
+                
+                strokeWeight(2);
+                rect(0, 0, this.width, this.height, 8);
+                
+                fill(ColorUtils.apply(Colors.TEXT));
+                textAlign(CENTER, CENTER);
+                
+                // Card name
+                textSize(9);
+                textStyle(BOLD);
+                text(this.cardData.name, this.width/2, 15);
+                
+                // Delta formula
+                textSize(8);
+                textStyle(NORMAL);
+                const desc = this.cardData.description.replace(/δ\(ε\)\s*=\s*/, '');
+                text(desc, this.width/2, this.height/2);
+                
+                pop();
+            }
+            
+            isMouseOver() {
+                const scaledX = this.x + this.width/2 - (this.width * this.scale)/2;
+                const scaledY = this.y + this.height/2 - (this.height * this.scale)/2;
+                const scaledW = this.width * this.scale;
+                const scaledH = this.height * this.scale;
+                
+                return mouseX >= scaledX && mouseX <= scaledX + scaledW && 
+                       mouseY >= scaledY && mouseY <= scaledY + scaledH;
+            }
+            
+            setSelected(selected) {
+                this.isSelected = selected;
+            }
+            
+            getCardData() {
+                return this.cardData;
+            }
+            
+            moveTo(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+            
+            shake() {
+                const originalX = this.x;
+                this.x += random(-3, 3);
+                setTimeout(() => { this.x = originalX; }, 100);
+            }
+        }
+
+        // Graph renderer
+        class GraphRenderer {
+            constructor(x, y, width, height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                
+                this.graphBounds = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
+                this.currentFunction = null;
+                this.currentPoint = 0; // Always at x = 0
+                this.currentEpsilon = 0.1;
+                this.currentDelta = 0.1;
+            }
+            
+            updateFunction(func, c, epsilon, delta = 0.1) {
+                this.currentFunction = func;
+                this.currentPoint = 0; // Always at x = 0
+                this.currentEpsilon = epsilon;
+                this.currentDelta = delta;
+                
+                // Adjust graph bounds to ensure the point at x=0 is visible
+                if (func) {
+                    try {
+                        const f0 = func(0);
+                        if (isFinite(f0)) {
+                            // Ensure the point and epsilon band are visible
+                            const margin = Math.max(epsilon * 2, 0.5);
+                            const minY = f0 - epsilon - margin;
+                            const maxY = f0 + epsilon + margin;
+                            
+                            // Keep reasonable bounds but ensure visibility
+                            this.graphBounds.yMin = Math.min(-2, minY);
+                            this.graphBounds.yMax = Math.max(2, maxY);
+                            
+                            // Keep x bounds symmetric and reasonable
+                            this.graphBounds.xMin = -2;
+                            this.graphBounds.xMax = 2;
+                        }
+                    } catch (e) {
+                        // Fallback to default bounds
+                        this.graphBounds = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
+                    }
+                }
+            }
+            
+            draw() {
+                push();
+                
+                fill(ColorUtils.apply(Colors.CARD_BG));
+                stroke(ColorUtils.apply(Colors.TEXT, 0.3));
+                strokeWeight(1);
+                rect(this.x, this.y, this.width, this.height);
+                
+                this.drawGrid();
+                this.drawAxes();
+                
+                if (this.currentFunction) {
+                    this.drawEpsilonBand();
+                    this.drawDeltaInterval();
+                    this.drawFunction();
+                    this.drawPointMarker();
+                }
+                
+                pop();
+            }
+            
+            drawGrid() {
+                stroke(ColorUtils.apply(Colors.GRID));
+                strokeWeight(1);
+                
+                for (let x = Math.ceil(this.graphBounds.xMin); x <= this.graphBounds.xMax; x++) {
+                    const screenX = this.worldToScreenX(x);
+                    if (screenX >= this.x && screenX <= this.x + this.width) {
+                        line(screenX, this.y, screenX, this.y + this.height);
+                    }
+                }
+                
+                for (let y = Math.ceil(this.graphBounds.yMin); y <= this.graphBounds.yMax; y++) {
+                    const screenY = this.worldToScreenY(y);
+                    if (screenY >= this.y && screenY <= this.y + this.height) {
+                        line(this.x, screenY, this.x + this.width, screenY);
+                    }
+                }
+            }
+            
+            drawAxes() {
+                stroke(ColorUtils.apply(Colors.AXES));
+                strokeWeight(2);
+                
+                const xAxisY = this.worldToScreenY(0);
+                if (xAxisY >= this.y && xAxisY <= this.y + this.height) {
+                    line(this.x, xAxisY, this.x + this.width, xAxisY);
+                }
+                
+                const yAxisX = this.worldToScreenX(0);
+                if (yAxisX >= this.x && yAxisX <= this.x + this.width) {
+                    line(yAxisX, this.y, yAxisX, this.y + this.height);
+                }
+                
+                this.drawAxisLabels();
+            }
+            
+            drawAxisLabels() {
+                fill(ColorUtils.apply(Colors.TEXT));
+                textAlign(CENTER, CENTER);
+                textSize(10);
+                
+                for (let x = Math.ceil(this.graphBounds.xMin); x <= this.graphBounds.xMax; x++) {
+                    if (x !== 0) {
+                        const screenX = this.worldToScreenX(x);
+                        const screenY = this.worldToScreenY(0);
+                        if (screenX >= this.x && screenX <= this.x + this.width) {
+                            text(x.toString(), screenX, screenY + 15);
+                        }
+                    }
+                }
+                
+                textAlign(RIGHT, CENTER);
+                for (let y = Math.ceil(this.graphBounds.yMin); y <= this.graphBounds.yMax; y++) {
+                    if (y !== 0) {
+                        const screenX = this.worldToScreenX(0);
+                        const screenY = this.worldToScreenY(y);
+                        if (screenY >= this.y && screenY <= this.y + this.height) {
+                            text(y.toString(), screenX - 5, screenY);
+                        }
+                    }
+                }
+            }
+            
+            drawFunction() {
+                if (!this.currentFunction) return;
+                
+                const points = MathUtils.sampleFunction(this.currentFunction, this.graphBounds.xMin, this.graphBounds.xMax, 200);
+                if (points.length < 2) return;
+                
+                stroke(ColorUtils.apply(Colors.FUNCTION));
+                strokeWeight(3);
+                noFill();
+                
+                beginShape();
+                for (const point of points) {
+                    const screenX = this.worldToScreenX(point.x);
+                    const screenY = this.worldToScreenY(point.y);
+                    
+                    if (screenX >= this.x && screenX <= this.x + this.width &&
+                        screenY >= this.y && screenY <= this.y + this.height) {
+                        vertex(screenX, screenY);
+                    }
+                }
+                endShape();
+            }
+            
+            drawEpsilonBand() {
+                if (!this.currentFunction) return;
+                
+                try {
+                    const L = this.currentFunction(0); // Always at x = 0
+                    if (!isFinite(L)) return;
+                    
+                    const yMin = L - this.currentEpsilon;
+                    const yMax = L + this.currentEpsilon;
+                    
+                    const topY = this.worldToScreenY(yMax);
+                    const bottomY = this.worldToScreenY(yMin);
+                    const height = bottomY - topY;
+                    
+                    fill(ColorUtils.apply(Colors.EPSILON_BAND, 0.3));
+                    stroke(ColorUtils.apply(Colors.EPSILON_BAND, 0.8));
+                    strokeWeight(1);
+                    rect(this.x, topY, this.width, height);
+                    
+                    fill(ColorUtils.apply(Colors.EPSILON_BAND));
+                    textAlign(LEFT, CENTER);
+                    textSize(10);
+                    text(`f(0) + ε`, this.x + 5, topY - 10);
+                    text(`f(0) - ε`, this.x + 5, bottomY + 10);
+                } catch (e) {}
+            }
+            
+            drawDeltaInterval() {
+                const xMin = -this.currentDelta;
+                const xMax = this.currentDelta;
+                
+                const leftX = this.worldToScreenX(xMin);
+                const rightX = this.worldToScreenX(xMax);
+                const width = rightX - leftX;
+                
+                fill(ColorUtils.apply(Colors.DELTA_INTERVAL, 0.3));
+                stroke(ColorUtils.apply(Colors.DELTA_INTERVAL, 0.8));
+                strokeWeight(1);
+                rect(leftX, this.y, width, this.height);
+                
+                fill(ColorUtils.apply(Colors.DELTA_INTERVAL));
+                textAlign(CENTER, TOP);
+                textSize(10);
+                text(`-δ`, leftX, this.y + this.height - 25);
+                text(`+δ`, rightX, this.y + this.height - 25);
+            }
+            
+            drawPointMarker() {
+                if (!this.currentFunction) return;
+                
+                try {
+                    const L = this.currentFunction(0); // Always at x = 0
+                    if (!isFinite(L)) return;
+                    
+                    const screenX = this.worldToScreenX(0);
+                    const screenY = this.worldToScreenY(L);
+                    
+                    fill(ColorUtils.apply(Colors.POINT_MARKER));
+                    stroke(ColorUtils.apply(Colors.TEXT));
+                    strokeWeight(2);
+                    circle(screenX, screenY, 12);
+                    
+                    fill(ColorUtils.apply(Colors.TEXT));
+                    textAlign(LEFT, BOTTOM);
+                    textSize(10);
+                    text(`(0, ${L.toFixed(2)})`, screenX + 8, screenY - 8);
+                } catch (e) {}
+            }
+            
+            worldToScreenX(x) {
+                const scaleX = this.width / (this.graphBounds.xMax - this.graphBounds.xMin);
+                return this.x + (x - this.graphBounds.xMin) * scaleX;
+            }
+            
+            worldToScreenY(y) {
+                const scaleY = this.height / (this.graphBounds.yMax - this.graphBounds.yMin);
+                return this.y + this.height - (y - this.graphBounds.yMin) * scaleY;
+            }
+        }
+
+        // UI Manager
+        class UIManager {
+            constructor(canvasWidth, canvasHeight) {
+                this.canvasWidth = canvasWidth;
+                this.canvasHeight = canvasHeight;
+                
+                this.player1Cards = [];
+                this.player2Cards = [];
+                this.selectedCard1 = null;
+                this.selectedCard2 = null;
+                
+                this.setupLayout();
+                
+                this.scores = { player1: 0, player2: 0 };
+                this.currentChallenge = null;
+                this.gameState = 'waiting';
+                this.roundResult = null;
+                this.showNextRoundButton = false;
+                this.player1Submitted = false;
+                this.player2Submitted = false;
+            }
+            
+            setupLayout() {
+                this.areas = {
+                    player1: { x: 20, y: 120, width: 220, height: 450, handY: 170, handHeight: 320, buttonY: 500 },
+                    player2: { x: 820, y: 120, width: 220, height: 450, handY: 170, handHeight: 320, buttonY: 500 },
+                    graph: { x: 260, y: 140, width: 540, height: 360 },
+                    controls: { x: 380, y: 520, width: 300, height: 60 },
+                    header: { x: 0, y: 0, width: 1060, height: 110 }
+                };
+            }
+            
+            update() {
+                this.player1Cards.forEach(card => card.update());
+                this.player2Cards.forEach(card => card.update());
+            }
+            
+            draw() {
+                this.drawPlayerAreas();
+                this.drawHeader();
+                this.drawPlayerHand(1);
+                this.drawPlayerHand(2);
+                this.drawControls();
+                
+                if (this.currentChallenge) {
+                    this.drawChallengeInfo();
+                }
+                
+                if (this.roundResult) {
+                    this.drawRoundResult();
+                }
+            }
+            
+            drawPlayerAreas() {
+                fill(ColorUtils.apply(Colors.PANEL_BG, 0.7));
+                stroke(ColorUtils.apply(Colors.PRIMARY, 0.5));
+                strokeWeight(2);
+                rect(this.areas.player1.x, this.areas.player1.y, this.areas.player1.width, this.areas.player1.height, 10);
+                rect(this.areas.player2.x, this.areas.player2.y, this.areas.player2.width, this.areas.player2.height, 10);
+                
+                fill(ColorUtils.apply(Colors.TEXT));
+                textAlign(CENTER, CENTER);
+                textSize(18);
+                textStyle(BOLD);
+                text('Player 1', this.areas.player1.x + this.areas.player1.width/2, this.areas.player1.y + 25);
+                text('Player 2', this.areas.player2.x + this.areas.player2.width/2, this.areas.player2.y + 25);
+                
+                textSize(12);
+                textStyle(NORMAL);
+                text(`Cards: ${this.player1Cards.length}`, this.areas.player1.x + this.areas.player1.width/2, this.areas.player1.y + 45);
+                text(`Cards: ${this.player2Cards.length}`, this.areas.player2.x + this.areas.player2.width/2, this.areas.player2.y + 45);
+            }
+            
+            drawHeader() {
+                fill(ColorUtils.apply(Colors.PRIMARY, 0.1));
+                noStroke();
+                rect(0, 0, this.canvasWidth, this.areas.header.height);
+                
+                fill(ColorUtils.apply(Colors.PRIMARY));
+                textAlign(CENTER, CENTER);
+                textSize(28);
+                textStyle(BOLD);
+                text('Epsilon-Delta Game', this.canvasWidth/2, 30);
+                
+                fill(ColorUtils.apply(Colors.TEXT));
+                textSize(18);
+                textStyle(NORMAL);
+                text(`Player 1: ${this.scores.player1} | Player 2: ${this.scores.player2}`, this.canvasWidth/2, 60);
+                
+                textSize(14);
+                text('All functions are tested for continuity at x = 0', this.canvasWidth/2, 85);
+            }
+            
+            drawPlayerHand(playerNum) {
+                const cards = playerNum === 1 ? this.player1Cards : this.player2Cards;
+                const area = playerNum === 1 ? this.areas.player1 : this.areas.player2;
+                
+                const cardWidth = 90;
+                const cardHeight = 70;
+                const spacing = 8;
+                const cardsPerRow = 2;
+                
+                cards.forEach((card, index) => {
+                    const row = Math.floor(index / cardsPerRow);
+                    const col = index % cardsPerRow;
+                    
+                    const x = area.x + 15 + col * (cardWidth + spacing);
+                    const y = area.handY + row * (cardHeight + spacing);
+                    
+                    card.moveTo(x, y);
+                    card.draw();
+                });
+            }
+            
+            drawControls() {
+                const area = this.areas.controls;
+                
+                this.drawButton('Draw Challenge', area.x, area.y, 120, 40, this.gameState === 'waiting', 'drawChallenge');
+                
+                // Submit buttons with highlighting when submitted
+                const submit1Enabled = this.selectedCard1 && this.gameState === 'playing';
+                const submit2Enabled = this.selectedCard2 && this.gameState === 'playing';
+                this.drawSubmitButton('Submit δ', this.areas.player1.x + 70, this.areas.player1.buttonY, 80, 30, submit1Enabled, this.player1Submitted, 'submitPlayer1');
+                this.drawSubmitButton('Submit δ', this.areas.player2.x + 70, this.areas.player2.buttonY, 80, 30, submit2Enabled, this.player2Submitted, 'submitPlayer2');
+                
+                if (this.showNextRoundButton) {
+                    this.drawButton('Next Round', area.x + 140, area.y + 50, 120, 40, true, 'nextRound');
+                }
+            }
+            
+            drawButton(label, x, y, w, h, enabled, id) {
+                if (!this.buttons) this.buttons = {};
+                this.buttons[id] = { x, y, width: w, height: h, enabled };
+                
+                if (enabled) {
+                    fill(ColorUtils.apply(Colors.PRIMARY));
+                    stroke(ColorUtils.apply(Colors.PRIMARY));
+                } else {
+                    fill(ColorUtils.apply(Colors.DISABLED));
+                    stroke(ColorUtils.apply(Colors.DISABLED));
+                }
+                
+                strokeWeight(2);
+                rect(x, y, w, h, 5);
+                
+                fill(enabled ? ColorUtils.apply(Colors.TEXT_WHITE) : ColorUtils.apply(Colors.TEXT));
+                textAlign(CENTER, CENTER);
+                textSize(12);
+                textStyle(NORMAL);
+                text(label, x + w/2, y + h/2);
+            }
+            
+            drawSubmitButton(label, x, y, w, h, enabled, submitted, id) {
+                if (!this.buttons) this.buttons = {};
+                this.buttons[id] = { x, y, width: w, height: h, enabled };
+                
+                if (submitted) {
+                    // Highlight when submitted
+                    fill(ColorUtils.apply(Colors.SUCCESS));
+                    stroke(ColorUtils.apply(Colors.SUCCESS));
+                } else if (enabled) {
+                    fill(ColorUtils.apply(Colors.PRIMARY));
+                    stroke(ColorUtils.apply(Colors.PRIMARY));
+                } else {
+                    fill(ColorUtils.apply(Colors.DISABLED));
+                    stroke(ColorUtils.apply(Colors.DISABLED));
+                }
+                
+                strokeWeight(2);
+                rect(x, y, w, h, 5);
+                
+                fill((submitted || enabled) ? ColorUtils.apply(Colors.TEXT_WHITE) : ColorUtils.apply(Colors.TEXT));
+                textAlign(CENTER, CENTER);
+                textSize(12);
+                textStyle(NORMAL);
+                text(submitted ? 'Submitted!' : label, x + w/2, y + h/2);
+            }
+            
+            drawChallengeInfo() {
+                const x = this.areas.graph.x;
+                const y = this.areas.graph.y - 30;
+                const w = this.areas.graph.width;
+                
+                fill(ColorUtils.apply(Colors.CARD_BG, 0.95));
+                stroke(ColorUtils.apply(Colors.PRIMARY, 0.5));
+                strokeWeight(2);
+                rect(x, y - 20, w, 35, 5);
+                
+                fill(ColorUtils.apply(Colors.TEXT));
+                textAlign(CENTER, CENTER);
+                textSize(14);
+                textStyle(BOLD);
+                const challenge = this.currentChallenge;
+                const infoText = `${challenge.functionDescription} | ε = ${challenge.epsilon.toFixed(3)}`;
+                text(infoText, x + w/2, y - 2);
+            }
+            
+            drawRoundResult() {
+                const x = this.canvasWidth/2 - 200;
+                const y = 20; // Move to top of screen to avoid graph overlap
+                const w = 400;
+                const h = 70;
+                
+                fill(ColorUtils.apply(Colors.CARD_BG, 0.95));
+                stroke(ColorUtils.apply(Colors.SUCCESS, 0.8));
+                strokeWeight(3);
+                rect(x, y, w, h, 8);
+                
+                fill(ColorUtils.apply(Colors.TEXT));
+                textAlign(CENTER, CENTER);
+                textSize(16);
+                textStyle(BOLD);
+                text(this.roundResult.title, x + w/2, y + 25);
+                
+                textSize(12);
+                textStyle(NORMAL);
+                text(this.roundResult.details, x + w/2, y + 50);
+            }
+            
+            handleClick(x, y) {
+                if (this.buttons) {
+                    for (const [id, button] of Object.entries(this.buttons)) {
+                        if (button.enabled && x >= button.x && x <= button.x + button.width &&
+                            y >= button.y && y <= button.y + button.height) {
+                            this.handleButtonClick(id);
+                            return true;
+                        }
+                    }
+                }
+                
+                return this.handleCardClick(x, y);
+            }
+            
+            handleCardClick(x, y) {
+                for (const card of this.player1Cards) {
+                    if (card.isMouseOver()) {
+                        this.selectCard(1, card);
+                        return true;
+                    }
+                }
+                
+                for (const card of this.player2Cards) {
+                    if (card.isMouseOver()) {
+                        this.selectCard(2, card);
+                        return true;
+                    }
+                }
+                
+                return false;
+            }
+            
+            selectCard(playerNum, card) {
+                if (playerNum === 1) {
+                    if (this.selectedCard1) {
+                        this.selectedCard1.setSelected(false);
+                    }
+                    this.selectedCard1 = card;
+                    card.setSelected(true);
+                } else {
+                    if (this.selectedCard2) {
+                        this.selectedCard2.setSelected(false);
+                    }
+                    this.selectedCard2 = card;
+                    card.setSelected(true);
+                }
+            }
+            
+            handleButtonClick(buttonId) {
+                this.onButtonClick && this.onButtonClick(buttonId);
+            }
+            
+            addCardToHand(playerNum, cardData) {
+                const card = new Card(cardData, 0, 0, 90, 70);
+                
+                if (playerNum === 1) {
+                    this.player1Cards.push(card);
+                } else {
+                    this.player2Cards.push(card);
+                }
+                
+                return card;
+            }
+            
+            removeCardFromHand(playerNum, card) {
+                if (playerNum === 1) {
+                    const index = this.player1Cards.indexOf(card);
+                    if (index >= 0) {
+                        this.player1Cards.splice(index, 1);
+                    }
+                    if (this.selectedCard1 === card) {
+                        this.selectedCard1 = null;
+                    }
+                } else {
+                    const index = this.player2Cards.indexOf(card);
+                    if (index >= 0) {
+                        this.player2Cards.splice(index, 1);
+                    }
+                    if (this.selectedCard2 === card) {
+                        this.selectedCard2 = null;
+                    }
+                }
+            }
+            
+            updateScores(player1Score, player2Score) {
+                this.scores.player1 = player1Score;
+                this.scores.player2 = player2Score;
+            }
+            
+            setChallenge(challenge) {
+                this.currentChallenge = challenge;
+            }
+            
+            setGameState(state) {
+                this.gameState = state;
+            }
+            
+            showRoundResult(title, details) {
+                this.roundResult = { title, details };
+            }
+            
+            clearRoundResult() {
+                this.roundResult = null;
+            }
+            
+            setNextRoundButtonVisible(visible) {
+                this.showNextRoundButton = visible;
+            }
+            
+            getSelectedCards() {
+                return {
+                    player1: this.selectedCard1,
+                    player2: this.selectedCard2
+                };
+            }
+            
+            clearSelectedCards() {
+                if (this.selectedCard1) {
+                    this.selectedCard1.setSelected(false);
+                    this.selectedCard1 = null;
+                }
+                if (this.selectedCard2) {
+                    this.selectedCard2.setSelected(false);
+                    this.selectedCard2 = null;
+                }
+            }
+            
+            bothPlayersSubmitted() {
+                return this.player1Submitted && this.player2Submitted;
+            }
+            
+            setPlayerSubmitted(playerNum, submitted) {
+                if (playerNum === 1) {
+                    this.player1Submitted = submitted;
+                } else {
+                    this.player2Submitted = submitted;
+                }
+            }
+            
+            clearSubmissionState() {
+                this.player1Submitted = false;
+                this.player2Submitted = false;
+            }
+        }
+
+        // Game Manager
+        class GameManager {
+            constructor(uiManager, graphRenderer) {
+                this.uiManager = uiManager;
+                this.graphRenderer = graphRenderer;
+                
+                this.scores = { player1: 0, player2: 0 };
+                this.currentChallenge = null;
+                this.gameState = 'waiting';
+                
+                this.challengeDeck = null;
+                this.player1Deck = null;
+                this.player2Deck = null;
+                
+                this.setupEventHandlers();
+                this.initializeGame();
+            }
+            
+            setupEventHandlers() {
+                this.uiManager.onButtonClick = (buttonId) => {
+                    this.handleButtonClick(buttonId);
+                };
+            }
+            
+            initializeGame() {
+                this.createChallengeDeck();
+                this.createPlayerDecks();
+                this.dealInitialHands();
+                this.updateUI();
+            }
+            
+            createChallengeDeck() {
+                const challenges = [];
+                for (let i = 0; i < 20; i++) {
+                    challenges.push(CardData.generateChallenge());
+                }
+                this.challengeDeck = new Deck(challenges);
+                this.challengeDeck.shuffle();
+            }
+            
+            createPlayerDecks() {
+                const deltaCards = CardData.generateDeltaDeck();
+                this.player1Deck = new Deck(deltaCards);
+                this.player2Deck = new Deck(deltaCards);
+                
+                this.player1Deck.shuffle();
+                this.player2Deck.shuffle();
+            }
+            
+            dealInitialHands() {
+                // Each player gets 6 unique cards
+                for (let i = 0; i < 6; i++) {
+                    const card1 = this.drawUniqueCard(1);
+                    const card2 = this.drawUniqueCard(2);
+                    
+                    if (card1) {
+                        this.uiManager.addCardToHand(1, card1);
+                    }
+                    if (card2) {
+                        this.uiManager.addCardToHand(2, card2);
+                    }
+                }
+            }
+            
+            drawUniqueCard(playerNum) {
+                const deck = playerNum === 1 ? this.player1Deck : this.player2Deck;
+                const otherPlayerCards = playerNum === 1 ? this.uiManager.player2Cards : this.uiManager.player1Cards;
+                const currentPlayerCards = playerNum === 1 ? this.uiManager.player1Cards : this.uiManager.player2Cards;
+                
+                // Get names of all cards currently in both hands
+                const usedCardNames = new Set();
+                [...otherPlayerCards, ...currentPlayerCards].forEach(card => {
+                    usedCardNames.add(card.getCardData().name);
+                });
+                
+                // Try to find a unique card
+                let attempts = 0;
+                while (attempts < 50) { // Prevent infinite loop
+                    let card = deck.draw();
+                    if (!card) {
+                        deck.shuffleDiscardBack();
+                        card = deck.draw();
+                        if (!card) break;
+                    }
+                    
+                    if (!usedCardNames.has(card.name)) {
+                        return card; // Found a unique card
+                    }
+                    
+                    // Put the card back and try again
+                    deck.cards.unshift(card);
+                    deck.shuffle();
+                    attempts++;
+                }
+                
+                // If we can't find a unique card, just return any card
+                return deck.draw();
+            }
+            
+            handleButtonClick(buttonId) {
+                switch (buttonId) {
+                    case 'drawChallenge':
+                        this.drawChallenge();
+                        break;
+                    case 'submitPlayer1':
+                        this.submitCard(1);
+                        break;
+                    case 'submitPlayer2':
+                        this.submitCard(2);
+                        break;
+                    case 'nextRound':
+                        this.nextRound();
+                        break;
+                }
+            }
+            
+            drawChallenge() {
+                if (this.gameState !== 'waiting') return;
+                
+                const challenge = this.challengeDeck.draw();
+                if (!challenge) {
+                    this.createChallengeDeck();
+                    this.drawChallenge();
+                    return;
+                }
+                
+                this.currentChallenge = challenge;
+                this.gameState = 'playing';
+                
+                this.graphRenderer.updateFunction(challenge.f, 0, challenge.epsilon, 0.1);
+                this.updateUI();
+            }
+            
+            submitCard(playerNum) {
+                const selectedCards = this.uiManager.getSelectedCards();
+                const card = playerNum === 1 ? selectedCards.player1 : selectedCards.player2;
+                
+                if (!card || this.gameState !== 'playing') return;
+                
+                // Check if already submitted
+                if ((playerNum === 1 && this.uiManager.player1Submitted) || 
+                    (playerNum === 2 && this.uiManager.player2Submitted)) return;
+                
+                // Allow any card to be submitted (no validation here)
+                // Mark player as submitted
+                this.uiManager.setPlayerSubmitted(playerNum, true);
+                
+                if (this.uiManager.bothPlayersSubmitted()) {
+                    this.evaluateRound();
+                }
+                
+                this.updateUI();
+            }
+            
+            validateCard(card) {
+                if (!this.currentChallenge) return false;
+                
+                const cardData = card.getCardData();
+                const deltaFunc = cardData.delta;
+                
+                return MathUtils.checkContinuity(this.currentChallenge.f, 0, this.currentChallenge.epsilon, deltaFunc);
+            }
+            
+            evaluateRound() {
+                this.gameState = 'evaluating';
+                
+                const selectedCards = this.uiManager.getSelectedCards();
+                const card1 = selectedCards.player1;
+                const card2 = selectedCards.player2;
+                
+                // Check if each card is valid
+                const valid1 = this.validateCard(card1);
+                const valid2 = this.validateCard(card2);
+                
+                const delta1 = card1.getCardData().delta(this.currentChallenge.epsilon);
+                const delta2 = card2.getCardData().delta(this.currentChallenge.epsilon);
+                
+                let winner = null;
+                let resultTitle = '';
+                let resultDetails = '';
+                let winningDelta = 0.1; // Default delta for graph
+                
+                if (!valid1 && !valid2) {
+                    // Both cards are invalid - tie (both lose)
+                    resultTitle = 'Tie! Both Cards Invalid!';
+                    resultDetails = `Both δ values violate the ε-δ definition. No points awarded.`;
+                } else if (valid1 && !valid2) {
+                    // Player 1 wins (valid card vs invalid)
+                    winner = 'player1';
+                    this.scores.player1++;
+                    resultTitle = 'Player 1 Wins!';
+                    resultDetails = `Player 1: δ = ${delta1.toFixed(4)} (Valid) | Player 2: δ = ${delta2.toFixed(4)} (Invalid!)`;
+                    winningDelta = delta1;
+                } else if (!valid1 && valid2) {
+                    // Player 2 wins (valid card vs invalid)
+                    winner = 'player2';
+                    this.scores.player2++;
+                    resultTitle = 'Player 2 Wins!';
+                    resultDetails = `Player 1: δ = ${delta1.toFixed(4)} (Invalid!) | Player 2: δ = ${delta2.toFixed(4)} (Valid)`;
+                    winningDelta = delta2;
+                } else {
+                    // Both cards are valid - compare delta values
+                    if (delta1 > delta2) {
+                        winner = 'player1';
+                        this.scores.player1++;
+                        resultTitle = 'Player 1 Wins!';
+                        resultDetails = `δ₁ = ${delta1.toFixed(4)} > δ₂ = ${delta2.toFixed(4)} (Larger valid δ wins!)`;
+                        winningDelta = delta1;
+                    } else if (delta2 > delta1) {
+                        winner = 'player2';
+                        this.scores.player2++;
+                        resultTitle = 'Player 2 Wins!';
+                        resultDetails = `δ₂ = ${delta2.toFixed(4)} > δ₁ = ${delta1.toFixed(4)} (Larger valid δ wins!)`;
+                        winningDelta = delta2;
+                    } else {
+                        this.scores.player1++;
+                        this.scores.player2++;
+                        resultTitle = 'Tie! Both Players Win!';
+                        resultDetails = `δ₁ = δ₂ = ${delta1.toFixed(4)} (Equal valid δ values!)`;
+                        winningDelta = delta1;
+                    }
+                }
+                
+                // Update graph with the winning delta (or best valid delta)
+                this.graphRenderer.updateFunction(this.currentChallenge.f, 0, this.currentChallenge.epsilon, winningDelta);
+                
+                this.uiManager.showRoundResult(resultTitle, resultDetails);
+                this.uiManager.setNextRoundButtonVisible(true);
+                this.updateUI();
+            }
+            
+            nextRound() {
+                const selectedCards = this.uiManager.getSelectedCards();
+                if (selectedCards.player1) {
+                    this.uiManager.removeCardFromHand(1, selectedCards.player1);
+                }
+                if (selectedCards.player2) {
+                    this.uiManager.removeCardFromHand(2, selectedCards.player2);
+                }
+                
+                this.uiManager.clearSelectedCards();
+                this.uiManager.clearRoundResult();
+                this.uiManager.clearSubmissionState();
+                this.uiManager.setNextRoundButtonVisible(false);
+                
+                this.gameState = 'waiting';
+                this.currentChallenge = null;
+                
+                this.updateUI();
+            }
+            
+            updateUI() {
+                this.uiManager.updateScores(this.scores.player1, this.scores.player2);
+                this.uiManager.setChallenge(this.currentChallenge);
+                this.uiManager.setGameState(this.gameState);
+            }
+            
+            getScores() {
+                return { ...this.scores };
+            }
+            
+            getCurrentChallenge() {
+                return this.currentChallenge;
+            }
+            
+            getGameState() {
+                return this.gameState;
+            }
+        }
+
+        // Main p5.js code
+        let gameManager;
+        let uiManager;
+        let graphRenderer;
+
+        const CANVAS_WIDTH = 1060;
+        const CANVAS_HEIGHT = 620;
+
+        function setup() {
+            const canvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+            canvas.parent('game-container');
+            
+            graphRenderer = new GraphRenderer(260, 140, 540, 360);
+            uiManager = new UIManager(CANVAS_WIDTH, CANVAS_HEIGHT);
+            gameManager = new GameManager(uiManager, graphRenderer);
+        }
+
+        function draw() {
+            background(ColorUtils.apply(Colors.BACKGROUND));
+            
+            uiManager.update();
+            uiManager.draw();
+            graphRenderer.draw();
+        }
+
+        function mousePressed() {
+            uiManager.handleClick(mouseX, mouseY);
+        }
+
+        function keyPressed() {
+            switch (key) {
+                case 'd':
+                case 'D':
+                    gameManager.handleButtonClick('drawChallenge');
+                    break;
+                case 'n':
+                case 'N':
+                    gameManager.handleButtonClick('nextRound');
+                    break;
+            }
+        }
+
+
+    </script>
+</body>
+</html> 

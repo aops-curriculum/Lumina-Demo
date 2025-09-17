@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complex Number Puzzle Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+        
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .point-info {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .score {
+            font-size: 16px;
+            color: #28a745;
+        }
+        
+        .canvas-container {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .transformations {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .transformation-btn {
+            padding: 10px 12px;
+            border: 2px solid #007bff;
+            background: white;
+            color: #007bff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .transformation-btn:hover {
+            background: #007bff;
+            color: white;
+        }
+        
+        .transformation-btn.selected {
+            background: #007bff;
+            color: white;
+        }
+        
+        .transformation-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .sequence {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 15px;
+            min-height: 50px;
+            align-items: center;
+        }
+        
+        .sequence-slot {
+            width: 100px;
+            height: 40px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .sequence-slot.filled {
+            border-color: #007bff;
+            background: #e3f2fd;
+            color: #007bff;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .control-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .check-btn {
+            background: #28a745;
+            color: white;
+        }
+        
+        .check-btn:hover {
+            background: #218838;
+        }
+        
+        .clear-btn {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .clear-btn:hover {
+            background: #c82333;
+        }
+        
+        .new-game-btn {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .new-game-btn:hover {
+            background: #138496;
+        }
+        
+        .message {
+            text-align: center;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .difficulty-selector {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .difficulty-selector label {
+            font-weight: bold;
+            margin-right: 10px;
+            color: #333;
+        }
+        
+        .difficulty-select {
+            padding: 8px 12px;
+            border: 2px solid #007bff;
+            border-radius: 6px;
+            background: white;
+            color: #007bff;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .difficulty-select:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Complex Number Puzzle Game</h1>
+        
+        <div class="game-info">
+            <div class="point-info">
+                Point A: <span id="pointA">0 + 0i</span>
+            </div>
+            <div class="point-info">
+                Point B: <span id="pointB">0 + 0i</span>
+            </div>
+            <div class="score">
+                Score: <span id="score">0</span>
+            </div>
+        </div>
+        
+        <div class="difficulty-selector">
+            <label for="difficulty">Difficulty:</label>
+            <select id="difficulty" class="difficulty-select">
+                <option value="easy">Easy (1 transformation)</option>
+                <option value="medium">Medium (2 transformations)</option>
+                <option value="hard" selected>Hard (3 transformations)</option>
+            </select>
+        </div>
+        
+        <div class="message info" id="message">
+            Click transformations to build your sequence!
+        </div>
+        
+        <div class="canvas-container">
+            <div id="canvas"></div>
+        </div>
+        
+        <div class="transformations">
+            <button class="transformation-btn" data-transform="multiply_i">Multiply by i</button>
+            <button class="transformation-btn" data-transform="multiply_minus_i">Multiply by -i</button>
+            <button class="transformation-btn" data-transform="square">Square (z²)</button>
+            <button class="transformation-btn" data-transform="conjugate">Complex Conjugate</button>
+            <button class="transformation-btn" data-transform="negate">Negate (-z)</button>
+            <button class="transformation-btn" data-transform="add_1">Add 1</button>
+            <button class="transformation-btn" data-transform="subtract_1">Subtract 1</button>
+            <button class="transformation-btn" data-transform="multiply_2">Multiply by 2</button>
+        </div>
+        
+        <div class="sequence" id="sequence">
+            <div class="sequence-slot" data-slot="0">Step 1</div>
+            <div class="sequence-slot" data-slot="1">Step 2</div>
+            <div class="sequence-slot" data-slot="2">Step 3</div>
+        </div>
+        
+        <div class="controls">
+            <button class="control-btn check-btn" id="checkBtn">Check Solution</button>
+            <button class="control-btn clear-btn" id="clearBtn">Clear Sequence</button>
+            <button class="control-btn new-game-btn" id="newGameBtn">New Puzzle</button>
+        </div>
+    </div>
+
+    <script>
+        let canvas;
+        let pointA, pointB;
+        let selectedTransformations = [];
+        let score = 0;
+        let currentSequence = [];
+        let gridSize = 450;
+        let centerX, centerY;
+        let scale = 25;
+        let gridRange = 12;
+        
+        // Complex number class
+        class Complex {
+            constructor(real, imag) {
+                this.real = real;
+                this.imag = imag;
+            }
+            
+            add(other) {
+                return new Complex(this.real + other.real, this.imag + other.imag);
+            }
+            
+            multiply(other) {
+                return new Complex(
+                    this.real * other.real - this.imag * other.imag,
+                    this.real * other.imag + this.imag * other.real
+                );
+            }
+            
+            conjugate() {
+                return new Complex(this.real, -this.imag);
+            }
+            
+            negate() {
+                return new Complex(-this.real, -this.imag);
+            }
+            
+            square() {
+                return this.multiply(this);
+            }
+            
+            reciprocal() {
+                const denom = this.real * this.real + this.imag * this.imag;
+                return new Complex(this.real / denom, -this.imag / denom);
+            }
+            
+            toString() {
+                if (this.imag === 0) return this.real.toString();
+                if (this.real === 0) return this.imag + 'i';
+                return this.real + (this.imag >= 0 ? ' + ' : ' - ') + Math.abs(this.imag) + 'i';
+            }
+            
+            equals(other) {
+                return Math.abs(this.real - other.real) < 0.001 && Math.abs(this.imag - other.imag) < 0.001;
+            }
+        }
+        
+        // Transformation functions
+        const transformations = {
+            multiply_i: {
+                name: "Multiply by i",
+                apply: (z) => z.multiply(new Complex(0, 1))
+            },
+            multiply_minus_i: {
+                name: "Multiply by -i",
+                apply: (z) => z.multiply(new Complex(0, -1))
+            },
+            square: {
+                name: "Square (z²)",
+                apply: (z) => z.square()
+            },
+            conjugate: {
+                name: "Complex Conjugate",
+                apply: (z) => z.conjugate()
+            },
+            negate: {
+                name: "Negate (-z)",
+                apply: (z) => z.negate()
+            },
+            add_1: {
+                name: "Add 1",
+                apply: (z) => z.add(new Complex(1, 0))
+            },
+            subtract_1: {
+                name: "Subtract 1",
+                apply: (z) => z.add(new Complex(-1, 0))
+            },
+            multiply_2: {
+                name: "Multiply by 2",
+                apply: (z) => z.multiply(new Complex(2, 0))
+            }
+        };
+        
+        function setup() {
+            canvas = createCanvas(gridSize, gridSize);
+            canvas.parent('canvas');
+            centerX = gridSize / 2;
+            centerY = gridSize / 2;
+            
+            generateNewPuzzle();
+            setupEventListeners();
+        }
+        
+        function draw() {
+            drawComplexPlane();
+            drawPoints();
+            drawSequence();
+        }
+        
+        function updateGridScale() {
+            // Find the maximum absolute value of coordinates for both points
+            const maxReal = Math.max(Math.abs(pointA.real), Math.abs(pointB.real));
+            const maxImag = Math.max(Math.abs(pointA.imag), Math.abs(pointB.imag));
+            const maxCoord = Math.max(maxReal, maxImag);
+            
+            // Add some padding (at least 2 units)
+            const requiredRange = Math.max(maxCoord + 2, 8);
+            
+            // Update grid range and scale
+            gridRange = requiredRange;
+            scale = Math.min(gridSize / (2 * gridRange), 40); // Cap scale at 40 for readability
+            
+            // Ensure minimum scale for visibility
+            if (scale < 15) {
+                scale = 15;
+                gridRange = Math.ceil(gridSize / (2 * scale));
+            }
+        }
+        
+        function drawComplexPlane() {
+            background(255);
+            
+            // Update scale to fit both points
+            updateGridScale();
+            
+            // Draw grid
+            stroke(200);
+            strokeWeight(1);
+            
+            // Vertical lines (real axis)
+            for (let x = -gridRange; x <= gridRange; x++) {
+                let screenX = centerX + x * scale;
+                if (screenX >= 0 && screenX <= gridSize) {
+                    line(screenX, 0, screenX, gridSize);
+                }
+            }
+            
+            // Horizontal lines (imaginary axis)
+            for (let y = -gridRange; y <= gridRange; y++) {
+                let screenY = centerY - y * scale;
+                if (screenY >= 0 && screenY <= gridSize) {
+                    line(0, screenY, gridSize, screenY);
+                }
+            }
+            
+            // Draw axes
+            stroke(0);
+            strokeWeight(2);
+            line(0, centerY, gridSize, centerY); // Real axis
+            line(centerX, 0, centerX, gridSize); // Imaginary axis
+            
+            // Draw axis labels
+            fill(0);
+            noStroke();
+            textAlign(CENTER, CENTER);
+            textSize(14);
+            
+            // Real axis labels
+            for (let x = -gridRange; x <= gridRange; x++) {
+                if (x !== 0) {
+                    let screenX = centerX + x * scale;
+                    text(x.toString(), screenX, centerY + 20);
+                }
+            }
+            
+            // Imaginary axis labels
+            for (let y = -gridRange; y <= gridRange; y++) {
+                if (y !== 0) {
+                    let screenY = centerY - y * scale;
+                    text(y + 'i', centerX - 20, screenY);
+                }
+            }
+            
+            // Origin label
+            text('0', centerX - 15, centerY + 15);
+        }
+        
+        function drawPoints() {
+            // Draw point A
+            let screenX = centerX + pointA.real * scale;
+            let screenY = centerY - pointA.imag * scale;
+            
+            fill(255, 0, 0);
+            stroke(0);
+            strokeWeight(2);
+            ellipse(screenX, screenY, 12, 12);
+            
+            fill(0);
+            noStroke();
+            textAlign(CENTER, CENTER);
+            textSize(12);
+            text('A', screenX, screenY - 20);
+            
+            // Draw point B
+            screenX = centerX + pointB.real * scale;
+            screenY = centerY - pointB.imag * scale;
+            
+            fill(0, 0, 255);
+            stroke(0);
+            strokeWeight(2);
+            ellipse(screenX, screenY, 12, 12);
+            
+            fill(0);
+            noStroke();
+            textAlign(CENTER, CENTER);
+            textSize(12);
+            text('B', screenX, screenY - 20);
+        }
+        
+        function drawSequence() {
+            // Draw intermediate points if sequence is partially filled
+            if (currentSequence.length > 0) {
+                let currentPoint = pointA;
+                
+                for (let i = 0; i < currentSequence.length; i++) {
+                    const transform = transformations[currentSequence[i]];
+                    currentPoint = transform.apply(currentPoint);
+                    
+                    let screenX = centerX + currentPoint.real * scale;
+                    let screenY = centerY - currentPoint.imag * scale;
+                    
+                    // Draw intermediate point
+                    fill(255, 255, 0);
+                    stroke(0);
+                    strokeWeight(2);
+                    ellipse(screenX, screenY, 8, 8);
+                    
+                    // Draw arrow from previous point
+                    if (i > 0) {
+                        let prevPoint = pointA;
+                        for (let j = 0; j < i; j++) {
+                            prevPoint = transformations[currentSequence[j]].apply(prevPoint);
+                        }
+                        
+                        let prevScreenX = centerX + prevPoint.real * scale;
+                        let prevScreenY = centerY - prevPoint.imag * scale;
+                        
+                        stroke(100);
+                        strokeWeight(2);
+                        line(prevScreenX, prevScreenY, screenX, screenY);
+                        
+                        // Draw arrowhead
+                        let angle = atan2(screenY - prevScreenY, screenX - prevScreenX);
+                        let arrowLength = 10;
+                        let arrowAngle = PI / 6;
+                        
+                        line(screenX, screenY, 
+                             screenX - arrowLength * cos(angle - arrowAngle),
+                             screenY - arrowLength * sin(angle - arrowAngle));
+                        line(screenX, screenY,
+                             screenX - arrowLength * cos(angle + arrowAngle),
+                             screenY - arrowLength * sin(angle + arrowAngle));
+                    }
+                }
+            }
+        }
+        
+        function generateNewPuzzle() {
+            const difficulty = document.getElementById('difficulty').value;
+            const numTransformations = parseInt(difficulty.replace('hard', '3').replace('medium', '2').replace('easy', '1'));
+            
+            // Generate random integer points
+            pointA = new Complex(
+                Math.floor(Math.random() * 9) - 4,
+                Math.floor(Math.random() * 9) - 4
+            );
+            
+            // Keep trying until we get a valid puzzle with integer point B
+            let attempts = 0;
+            const maxAttempts = 1000;
+            
+            while (attempts < maxAttempts) {
+                // Generate a sequence of 3 random transformations
+                const transformKeys = Object.keys(transformations);
+                selectedTransformations = [];
+                
+                for (let i = 0; i < numTransformations; i++) {
+                    const randomKey = transformKeys[Math.floor(Math.random() * transformKeys.length)];
+                    selectedTransformations.push(randomKey);
+                }
+                
+                // Apply the transformations to get point B
+                let currentPoint = pointA;
+                for (const transformKey of selectedTransformations) {
+                    currentPoint = transformations[transformKey].apply(currentPoint);
+                }
+                
+                // Check if point B has integer coordinates (within small tolerance)
+                const realIsInteger = Math.abs(Math.round(currentPoint.real) - currentPoint.real) < 0.001;
+                const imagIsInteger = Math.abs(Math.round(currentPoint.imag) - currentPoint.imag) < 0.001;
+                
+                if (realIsInteger && imagIsInteger) {
+                    // Round to exact integers
+                    pointB = new Complex(Math.round(currentPoint.real), Math.round(currentPoint.imag));
+                    
+                    // Update display
+                    document.getElementById('pointA').textContent = pointA.toString();
+                    document.getElementById('pointB').textContent = pointB.toString();
+                    
+                    // Clear current sequence
+                    currentSequence = [];
+                    updateSequenceDisplay();
+                    updateMessage(`New puzzle generated! Find the sequence of ${numTransformations} transformation${numTransformations > 1 ? 's' : ''}.`, 'info');
+                    return;
+                }
+                
+                attempts++;
+            }
+            
+            // If we couldn't find a valid puzzle after many attempts, generate a simpler one
+            // Use only transformations that preserve integer coordinates
+            const integerSafeTransforms = ['multiply_i', 'multiply_minus_i', 'conjugate', 'negate', 'add_1', 'subtract_1', 'multiply_2'];
+            
+            selectedTransformations = [];
+            for (let i = 0; i < numTransformations; i++) {
+                const randomKey = integerSafeTransforms[Math.floor(Math.random() * integerSafeTransforms.length)];
+                selectedTransformations.push(randomKey);
+            }
+            
+            // Apply the transformations to get point B
+            let currentPoint = pointA;
+            for (const transformKey of selectedTransformations) {
+                currentPoint = transformations[transformKey].apply(currentPoint);
+            }
+            pointB = currentPoint;
+            
+            // Update display
+            document.getElementById('pointA').textContent = pointA.toString();
+            document.getElementById('pointB').textContent = pointB.toString();
+            
+            // Clear current sequence
+            currentSequence = [];
+            updateSequenceDisplay();
+            updateMessage(`New puzzle generated! Find the sequence of ${numTransformations} transformation${numTransformations > 1 ? 's' : ''}.`, 'info');
+        }
+        
+        function setupEventListeners() {
+            // Transformation buttons
+            document.querySelectorAll('.transformation-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const difficulty = document.getElementById('difficulty').value;
+                    const maxTransformations = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3;
+                    
+                    if (currentSequence.length < maxTransformations) {
+                        const transformKey = btn.dataset.transform;
+                        currentSequence.push(transformKey);
+                        updateSequenceDisplay();
+                        updateTransformationButtons();
+                        
+                        if (currentSequence.length === maxTransformations) {
+                            updateMessage('Sequence complete! Click "Check Solution" to verify.', 'info');
+                        }
+                    }
+                });
+            });
+            
+            // Control buttons
+            document.getElementById('checkBtn').addEventListener('click', checkSolution);
+            document.getElementById('clearBtn').addEventListener('click', clearSequence);
+            document.getElementById('newGameBtn').addEventListener('click', generateNewPuzzle);
+            document.getElementById('difficulty').addEventListener('change', generateNewPuzzle); // Update puzzle on difficulty change
+        }
+        
+        function updateSequenceDisplay() {
+            const difficulty = document.getElementById('difficulty').value;
+            const maxTransformations = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3;
+            
+            const sequenceContainer = document.getElementById('sequence');
+            sequenceContainer.innerHTML = '';
+            
+            for (let i = 0; i < maxTransformations; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'sequence-slot';
+                slot.dataset.slot = i;
+                
+                if (i < currentSequence.length) {
+                    const transformKey = currentSequence[i];
+                    slot.textContent = transformations[transformKey].name;
+                    slot.className = 'sequence-slot filled';
+                } else {
+                    slot.textContent = `Step ${i + 1}`;
+                }
+                
+                sequenceContainer.appendChild(slot);
+            }
+        }
+        
+        function updateTransformationButtons() {
+            const difficulty = document.getElementById('difficulty').value;
+            const maxTransformations = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3;
+            
+            const buttons = document.querySelectorAll('.transformation-btn');
+            buttons.forEach(btn => {
+                if (currentSequence.length >= maxTransformations) {
+                    btn.classList.add('disabled');
+                } else {
+                    btn.classList.remove('disabled');
+                }
+            });
+        }
+        
+        function checkSolution() {
+            const difficulty = document.getElementById('difficulty').value;
+            const requiredTransformations = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3;
+            
+            if (currentSequence.length !== requiredTransformations) {
+                updateMessage(`Please select exactly ${requiredTransformations} transformation${requiredTransformations > 1 ? 's' : ''}!`, 'error');
+                return;
+            }
+            
+            // Apply the sequence to point A
+            let currentPoint = pointA;
+            for (const transformKey of currentSequence) {
+                currentPoint = transformations[transformKey].apply(currentPoint);
+            }
+            
+            // Check if we reached point B
+            if (currentPoint.equals(pointB)) {
+                score += 10;
+                document.getElementById('score').textContent = score;
+                updateMessage('Correct! Well done! +10 points', 'success');
+            } else {
+                updateMessage(`Incorrect! Your result: ${currentPoint.toString()}, Target: ${pointB.toString()}`, 'error');
+            }
+        }
+        
+        function clearSequence() {
+            currentSequence = [];
+            updateSequenceDisplay();
+            updateTransformationButtons();
+            updateMessage('Sequence cleared. Try again!', 'info');
+        }
+        
+        function updateMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+        }
+    </script>
+</body>
+</html> 

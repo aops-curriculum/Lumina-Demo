@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parabola Geometric Definition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .description {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        
+        .canvas-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .control-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+        
+        .control-section h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 18px;
+        }
+        
+        .slider-container {
+            margin-bottom: 15px;
+        }
+        
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+        }
+        
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .value-display {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .info-panel {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #2196f3;
+            margin-bottom: 20px;
+        }
+        
+        .info-panel h3 {
+            margin: 0 0 10px 0;
+            color: #1976d2;
+        }
+        
+        .info-panel p {
+            margin: 5px 0;
+            color: #333;
+            line-height: 1.4;
+        }
+        
+        .formula {
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .instructions {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #ffc107;
+            margin-bottom: 20px;
+        }
+        
+        .instructions h3 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+        
+        .instructions p {
+            margin: 5px 0;
+            color: #333;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Parabola Geometric Definition</h1>
+        
+        <div class="description">
+            Explore the geometric definition of a parabola: the set of all points equidistant from a focus point and a directrix line.
+        </div>
+        
+        <div class="instructions">
+            <h3>How to Use</h3>
+            <p><strong>Drag the red focus point</strong> to move it around the plane.</p>
+            <p><strong>Drag the blue directrix line</strong> to change its position and orientation.</p>
+            <p><strong>Use the sliders</strong> to fine-tune the focus position and directrix angle.</p>
+            <p>The green parabola will update dynamically as you move the focus and directrix!</p>
+        </div>
+        
+        <div class="canvas-container">
+            <div id="p5-canvas"></div>
+        </div>
+        
+        <div class="controls">
+            <div class="control-section">
+                <h3>Focus Point Controls</h3>
+                <div class="slider-container">
+                    <label for="focus-x-slider">Focus X: <span id="focus-x-value">0</span></label>
+                    <input type="range" id="focus-x-slider" class="slider" min="-8" max="8" step="0.1" value="0">
+                </div>
+                <div class="slider-container">
+                    <label for="focus-y-slider">Focus Y: <span id="focus-y-value">2</span></label>
+                    <input type="range" id="focus-y-slider" class="slider" min="-6" max="6" step="0.1" value="2">
+                </div>
+                <div class="value-display">Drag the red point or use sliders to move the focus</div>
+            </div>
+            
+            <div class="control-section">
+                <h3>Directrix Controls</h3>
+                <div class="slider-container">
+                    <label for="directrix-y-slider">Directrix Y: <span id="directrix-y-value">-2</span></label>
+                    <input type="range" id="directrix-y-slider" class="slider" min="-6" max="6" step="0.1" value="-2">
+                </div>
+                <div class="value-display">Drag the blue line or use sliders to adjust the directrix</div>
+                
+                <div class="slider-container">
+                    <label for="show-lines-toggle">Show Distance Lines</label>
+                    <input type="checkbox" id="show-lines-toggle" checked>
+                    <div class="value-display">Toggle to show/hide lines from parabola to focus and directrix</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Geometric Definition</h3>
+            <p>A <strong>parabola</strong> is the set of all points P such that the distance from P to the focus equals the distance from P to the directrix.</p>
+            <p><span class="formula">d(P, focus) = d(P, directrix)</span></p>
+            <p>As you move the focus and directrix, notice how the parabola's shape changes. The vertex is always halfway between the focus and directrix!</p>
+        </div>
+    </div>
+    
+    <script>
+        // Parabola Geometric Definition Interactive
+        let canvas;
+        let focusX = 0, focusY = 2;
+        let directrixY = -2;
+        let showDistanceLines = true;
+        
+        // Canvas dimensions and scaling
+        let canvasWidth = 800;
+        let canvasHeight = 600;
+        let margin = 60;
+        let plotWidth, plotHeight;
+        let xMin = -8, xMax = 8;
+        let yMin = -6, yMax = 6;
+        
+        // Colors
+        let colors = {
+            background: [248, 249, 250],
+            grid: [220, 220, 220],
+            axis: [100, 100, 100],
+            focus: [244, 67, 54],
+            directrix: [33, 150, 243],
+            parabola: [76, 175, 80],
+            text: [33, 33, 33],
+            samplePoint: [255, 193, 7]
+        };
+        
+        // Interaction variables
+        let draggingFocus = false;
+        let draggingDirectrix = false;
+        let dragStartX, dragStartY;
+        
+        function setup() {
+            canvas = createCanvas(canvasWidth, canvasHeight);
+            canvas.parent('p5-canvas');
+            
+            plotWidth = canvasWidth - 2 * margin;
+            plotHeight = canvasHeight - 2 * margin;
+            
+            // Set up event listeners
+            setupEventListeners();
+        }
+        
+        function draw() {
+            background(colors.background);
+            
+            // Draw coordinate system
+            drawCoordinateSystem();
+            
+            // Draw directrix
+            drawDirectrix();
+            
+            // Draw parabola
+            drawParabola();
+            
+            // Draw focus
+            drawFocus();
+            
+            // Draw sample points to demonstrate the definition
+            drawSamplePoints();
+            
+            // Draw labels and annotations
+            drawLabels();
+        }
+        
+        function drawCoordinateSystem() {
+            // Draw grid
+            stroke(colors.grid);
+            strokeWeight(1);
+            
+            // Vertical grid lines
+            for (let x = xMin; x <= xMax; x += 1) {
+                let screenX = mapX(x);
+                line(screenX, margin, screenX, height - margin);
+            }
+            
+            // Horizontal grid lines
+            for (let y = yMin; y <= yMax; y += 1) {
+                let screenY = mapY(y);
+                line(margin, screenY, width - margin, screenY);
+            }
+            
+            // Draw axes
+            stroke(colors.axis);
+            strokeWeight(2);
+            
+            // X-axis
+            let xAxisY = mapY(0);
+            line(margin, xAxisY, width - margin, xAxisY);
+            
+            // Y-axis
+            let yAxisX = mapX(0);
+            line(yAxisX, margin, yAxisX, height - margin);
+            
+            // Draw axis labels
+            fill(colors.text);
+            textAlign(CENTER, CENTER);
+            textSize(12);
+            
+            // X-axis labels
+            for (let x = xMin; x <= xMax; x += 2) {
+                if (x !== 0) {
+                    text(x, mapX(x), mapY(0) + 20);
+                }
+            }
+            
+            // Y-axis labels
+            for (let y = yMin; y <= yMax; y += 2) {
+                if (y !== 0) {
+                    text(y, mapX(0) - 20, mapY(y));
+                }
+            }
+            
+            // Origin label
+            text("0", mapX(0) - 20, mapY(0) + 20);
+        }
+        
+        function drawDirectrix() {
+            stroke(colors.directrix);
+            strokeWeight(3);
+            
+            // Draw horizontal directrix line
+            let screenY = mapY(directrixY);
+            line(margin, screenY, width - margin, screenY);
+            
+            // Draw directrix label
+            fill(colors.directrix);
+            textAlign(LEFT, CENTER);
+            textSize(14);
+            text("Directrix", width - margin + 10, screenY);
+        }
+        
+        function drawParabola() {
+            stroke(colors.parabola);
+            strokeWeight(2);
+            noFill();
+            
+            // Standard parabola with horizontal directrix
+            let p = (focusY - directrixY) / 2; // distance from focus to directrix / 2
+            let vertexY = (focusY + directrixY) / 2;
+            
+            // Draw parabola using parametric form
+            beginShape();
+            for (let x = xMin; x <= xMax; x += 0.1) {
+                let y = vertexY + (x - focusX) * (x - focusX) / (4 * p);
+                let screenX = mapX(x);
+                let screenY = mapY(y);
+                vertex(screenX, screenY);
+            }
+            endShape();
+        }
+        
+
+        
+        function drawFocus() {
+            fill(colors.focus);
+            stroke(colors.focus);
+            strokeWeight(2);
+            
+            let screenX = mapX(focusX);
+            let screenY = mapY(focusY);
+            
+            ellipse(screenX, screenY, 12, 12);
+            
+            // Draw focus label
+            fill(colors.focus);
+            textAlign(LEFT, CENTER);
+            textSize(14);
+            text("Focus", screenX + 15, screenY);
+        }
+        
+        function drawSamplePoints() {
+            // Draw a few sample points to demonstrate the geometric definition
+            let samplePoints = [];
+            
+            // Generate sample points along the parabola
+            for (let x = xMin; x <= xMax; x += 2) {
+                let p = (focusY - directrixY) / 2;
+                let vertexY = (focusY + directrixY) / 2;
+                let y = vertexY + (x - focusX) * (x - focusX) / (4 * p);
+                samplePoints.push({x: x, y: y});
+            }
+            
+            // Draw sample points and their distances
+            for (let i = 0; i < samplePoints.length; i++) {
+                let point = samplePoints[i];
+                let screenX = mapX(point.x);
+                let screenY = mapY(point.y);
+                
+                // Draw point
+                fill(colors.samplePoint);
+                stroke(colors.samplePoint);
+                strokeWeight(2);
+                ellipse(screenX, screenY, 8, 8);
+                
+                // Draw distance lines only if toggle is on
+                if (showDistanceLines) {
+                    // Draw line to focus
+                    stroke(colors.focus);
+                    strokeWeight(1);
+                    line(screenX, screenY, mapX(focusX), mapY(focusY));
+                    
+                    // Draw line to directrix
+                    stroke(colors.directrix);
+                    strokeWeight(1);
+                    line(screenX, screenY, screenX, mapY(directrixY));
+                }
+            }
+        }
+        
+        function drawLabels() {
+            fill(colors.text);
+            textAlign(CENTER, CENTER);
+            textSize(16);
+            text("Parabola", width/2, 25);
+            textSize(12);
+            text(`Focus: (${focusX.toFixed(1)}, ${focusY.toFixed(1)}) | Directrix: y = ${directrixY.toFixed(1)}`, width/2, 45);
+        }
+        
+        function mapX(x) {
+            return margin + (x - xMin) * plotWidth / (xMax - xMin);
+        }
+        
+        function mapY(y) {
+            return height - margin - (y - yMin) * plotHeight / (yMax - yMin);
+        }
+        
+        function mousePressed() {
+            let mouseXInPlot = map(mouseX, margin, width - margin, xMin, xMax);
+            let mouseYInPlot = map(mouseY, height - margin, margin, yMin, yMax);
+            
+            // Check if clicking on focus
+            if (dist(mouseX, mouseY, mapX(focusX), mapY(focusY)) < 15) {
+                draggingFocus = true;
+                dragStartX = mouseXInPlot - focusX;
+                dragStartY = mouseYInPlot - focusY;
+                return;
+            }
+            
+            // Check if clicking on directrix
+            if (abs(mouseYInPlot - directrixY) < 0.5) {
+                draggingDirectrix = true;
+                dragStartY = mouseYInPlot - directrixY;
+                return;
+            }
+        }
+        
+        function mouseDragged() {
+            let mouseXInPlot = map(mouseX, margin, width - margin, xMin, xMax);
+            let mouseYInPlot = map(mouseY, height - margin, margin, yMin, yMax);
+            
+            if (draggingFocus) {
+                focusX = constrain(mouseXInPlot - dragStartX, xMin, xMax);
+                focusY = constrain(mouseYInPlot - dragStartY, yMin, yMax);
+                updateFocusSliders();
+            }
+            
+            if (draggingDirectrix) {
+                directrixY = constrain(mouseYInPlot - dragStartY, yMin, yMax);
+                updateDirectrixSliders();
+            }
+        }
+        
+        function mouseReleased() {
+            draggingFocus = false;
+            draggingDirectrix = false;
+        }
+        
+        function setupEventListeners() {
+            // Focus controls
+            document.getElementById('focus-x-slider').addEventListener('input', function() {
+                focusX = parseFloat(this.value);
+                document.getElementById('focus-x-value').textContent = focusX.toFixed(1);
+            });
+            
+            document.getElementById('focus-y-slider').addEventListener('input', function() {
+                focusY = parseFloat(this.value);
+                document.getElementById('focus-y-value').textContent = focusY.toFixed(1);
+            });
+            
+            // Directrix controls
+            document.getElementById('directrix-y-slider').addEventListener('input', function() {
+                directrixY = parseFloat(this.value);
+                document.getElementById('directrix-y-value').textContent = directrixY.toFixed(1);
+            });
+            
+            // Distance lines toggle
+            document.getElementById('show-lines-toggle').addEventListener('change', function() {
+                showDistanceLines = this.checked;
+            });
+        }
+        
+        function updateFocusSliders() {
+            document.getElementById('focus-x-slider').value = focusX;
+            document.getElementById('focus-x-value').textContent = focusX.toFixed(1);
+            document.getElementById('focus-y-slider').value = focusY;
+            document.getElementById('focus-y-value').textContent = focusY.toFixed(1);
+        }
+        
+        function updateDirectrixSliders() {
+            document.getElementById('directrix-y-slider').value = directrixY;
+            document.getElementById('directrix-y-value').textContent = directrixY.toFixed(1);
+        }
+    </script>
+</body>
+</html> 

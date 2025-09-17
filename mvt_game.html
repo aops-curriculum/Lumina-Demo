@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mean Value Theorem – Guess Mode</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6fa;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.04);
+    }
+    
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    
+    canvas {
+      display: block;
+      margin: 1em auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+    
+    button {
+      margin-left: 0.5em;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #007bff;
+      color: white;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    button:hover {
+      background: #0056b3;
+    }
+    
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+    
+    select {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      font-size: 14px;
+    }
+    
+    label {
+      font-weight: 500;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Mean Value Theorem – Student Guess Mode</h2>
+    <label for="funcSelect">Choose a function: </label>
+    <select id="funcSelect">
+      <option value="cubic">f(x) = x³ - x</option>
+      <option value="sine">f(x) = 10sin(x)</option>
+      <option value="cosx2">f(x) = 10cos(x²)</option>
+      <option value="gaussianSine">f(x) = 10e^(-x²)·sin(2x)</option>
+    </select>
+    <button id="lockBtn">Lock in A and B</button>
+    <button id="lockCBtn" disabled>Lock in C</button>
+    <button id="tryAgainBtn" disabled>Try Again</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+
+<script>
+let f, df;
+let xMin = -3, xMax = 3, yMin = -11, yMax = 11;
+let pointA = { x: -1 }, pointB = { x: 1 }, pointC = { x: 0 };
+let draggingA = false, draggingB = false, draggingC = false;
+let isLockedAB = false;
+let isLockedC = false;
+const radius = 8;
+const MATCH_THRESHOLD = 0.05;
+
+const functions = {
+  cubic: {
+    f: x => x ** 3 - x,
+    df: x => 3 * x ** 2 - 1
+  },
+  sine: {
+    f: x => 10 * Math.sin(x),
+    df: x => 10 * Math.cos(x)
+  },
+  cosx2: {
+    f: x => 10 * Math.cos(x ** 2),
+    df: x => -20 * x * Math.sin(x ** 2)
+  },
+  gaussianSine: {
+    f: x => 10 * Math.exp(-(x ** 2)) * Math.sin(2 * x),
+    df: x => 10 * Math.exp(-(x ** 2)) * (2 * Math.cos(2 * x) - 2 * x * Math.sin(2 * x))
+  }
+};
+
+function setup() {
+  createCanvas(800, 600);
+  textSize(12);
+  const select = document.getElementById("funcSelect");
+  f = functions[select.value].f;
+  df = functions[select.value].df;
+
+  select.addEventListener("change", e => {
+    const selected = e.target.value;
+    f = functions[selected].f;
+    df = functions[selected].df;
+    resetAll();
+  });
+
+  document.getElementById("lockBtn").addEventListener("click", () => {
+    isLockedAB = true;
+    pointC.x = (pointA.x + pointB.x) / 2;
+    document.getElementById("lockCBtn").disabled = false;
+  });
+
+  document.getElementById("lockCBtn").addEventListener("click", () => {
+    isLockedC = true;
+    document.getElementById("lockCBtn").disabled = true;
+    document.getElementById("tryAgainBtn").disabled = false;
+  });
+
+  document.getElementById("tryAgainBtn").addEventListener("click", () => {
+    isLockedC = false;
+    document.getElementById("lockCBtn").disabled = false;
+    document.getElementById("tryAgainBtn").disabled = true;
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", resetAll);
+}
+
+function draw() {
+  background(255);
+  drawAxes();
+
+  const ax = graphToScreenX(pointA.x);
+  const ay = graphToScreenY(f(pointA.x));
+  const bx = graphToScreenX(pointB.x);
+  const by = graphToScreenY(f(pointB.x));
+  const secantSlope = (f(pointB.x) - f(pointA.x)) / (pointB.x - pointA.x);
+
+  // Function curve
+  noFill(); stroke(0);
+  beginShape();
+  for (let x = xMin; x <= xMax; x += 0.01) {
+    const y = f(x);
+    if (isFinite(y)) vertex(graphToScreenX(x), graphToScreenY(y));
+  }
+  endShape();
+
+  // Secant + A, B
+  stroke(0, 0, 255);
+  line(ax, ay, bx, by);
+  noStroke(); fill(0);
+  ellipse(ax, ay, radius);
+  ellipse(bx, by, radius);
+  drawLabel(ax, ay, `A`);
+  drawLabel(bx, by, `B`);
+
+  if (isLockedAB) {
+    const cx = graphToScreenX(pointC.x);
+    const fc = f(pointC.x);
+    const cy = graphToScreenY(fc);
+    fill(100);
+    ellipse(cx, cy, radius * 1.2);
+    drawLabel(cx, cy, `C`);
+
+    if (isLockedC) {
+      const slopeAtC = df(pointC.x);
+      const slopeDiff = slopeAtC - secantSlope;
+      const absDiff = Math.abs(slopeDiff);
+      const isMatch = absDiff < MATCH_THRESHOLD;
+
+      // Draw tangent at C
+stroke(isMatch ? color(0, 180, 0) : color(255, 0, 0));
+const dx = 0.75;
+line(graphToScreenX(pointC.x - dx), graphToScreenY(fc - slopeAtC * dx),
+     graphToScreenX(pointC.x + dx), graphToScreenY(fc + slopeAtC * dx));
+
+// Feedback
+fill(0);
+text(`Secant slope: ${secantSlope.toFixed(3)}`, 10, 20);
+
+if (isMatch) {
+  fill(0, 150, 0);
+  text("✔ Correct! The slopes match!", 10, 40);
+} else {
+  fill(200, 0, 0);
+  if (Math.abs(slopeAtC) > Math.abs(secantSlope)) {
+    text("Too steep. Try a lower slope.", 10, 40);
+  } else {
+    text("Too shallow. Try a steeper slope.", 10, 40);
+  }
+}
+
+    }
+  }
+}
+
+function drawAxes() {
+  stroke(180);
+  const zeroX = graphToScreenX(0);
+  const zeroY = graphToScreenY(0);
+  line(graphToScreenX(xMin), zeroY, graphToScreenX(xMax), zeroY);
+  line(zeroX, graphToScreenY(yMin), zeroX, graphToScreenY(yMax));
+
+  push();
+  fill(0); noStroke(); textAlign(CENTER, CENTER);
+  for (let i = Math.ceil(xMin); i <= Math.floor(xMax); i++) {
+    const x = graphToScreenX(i);
+    text(i, x, zeroY + 15);
+    stroke(200);
+    line(x, zeroY - 5, x, zeroY + 5);
+  }
+  for (let j = Math.ceil(yMin); j <= Math.floor(yMax); j++) {
+    const y = graphToScreenY(j);
+    text(j, zeroX - 20, y);
+    stroke(200);
+    line(zeroX - 5, y, zeroX + 5, y);
+  }
+  text("x", width - 20, zeroY - 10);
+  text("y", zeroX + 10, 10);
+  pop();
+}
+
+function drawLabel(x, y, txt) {
+  push();
+  fill(0); textAlign(LEFT, BOTTOM);
+  text(txt, x + 5, y - 5);
+  pop();
+}
+
+function graphToScreenX(x) {
+  return map(x, xMin, xMax, 0, width);
+}
+function graphToScreenY(y) {
+  return map(y, yMin, yMax, height, 0);
+}
+function screenToGraphX(x) {
+  return map(x, 0, width, xMin, xMax);
+}
+
+function mousePressed() {
+  const mx = mouseX, my = mouseY;
+
+  if (!isLockedAB) {
+    const ax = graphToScreenX(pointA.x);
+    const ay = graphToScreenY(f(pointA.x));
+    const bx = graphToScreenX(pointB.x);
+    const by = graphToScreenY(f(pointB.x));
+    if (dist(mx, my, ax, ay) < radius) draggingA = true;
+    if (dist(mx, my, bx, by) < radius) draggingB = true;
+  } else if (!isLockedC) {
+    const cx = graphToScreenX(pointC.x);
+    const cy = graphToScreenY(f(pointC.x));
+    if (dist(mx, my, cx, cy) < radius * 1.5) draggingC = true;
+  }
+}
+
+function mouseDragged() {
+  const gx = screenToGraphX(constrain(mouseX, 0, width));
+  const fy = f(gx);
+  const sy = graphToScreenY(fy);
+  if (sy < 0 || sy > height) return;
+
+  if (!isLockedAB) {
+    if (draggingA) pointA.x = constrain(gx, xMin, pointB.x - 0.1);
+    if (draggingB) pointB.x = constrain(gx, pointA.x + 0.1, xMax);
+  } else if (!isLockedC && draggingC) {
+    pointC.x = constrain(gx, pointA.x, pointB.x);
+  }
+}
+
+function mouseReleased() {
+  draggingA = draggingB = draggingC = false;
+}
+
+function resetAll() {
+  isLockedAB = false;
+  isLockedC = false;
+  pointA.x = -1;
+  pointB.x = 1;
+  pointC.x = 0;
+  document.getElementById("lockCBtn").disabled = true;
+  document.getElementById("tryAgainBtn").disabled = true;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mean Value Theorem Visualizer</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6fa;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.04);
+    }
+    
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+    
+    select {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      font-size: 14px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    
+    label {
+      font-weight: 500;
+      color: #333;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Mean Value Theorem Visualizer</h2>
+    
+    <div class="controls">
+      <div class="control-group">
+        <label for="funcSelect">Choose a function:</label>
+        <select id="funcSelect">
+          <option value="cubic">f(x) = x³ - x</option>
+          <option value="sine">f(x) = 10sin(x)</option>
+          <option value="cosx2">f(x) = 10cos(x²)</option>
+          <option value="gaussianSine">f(x) = 10e^(-x²)·sin(2x)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+<script>
+let f = x => x ** 3 - x;
+let df = x => 3 * x ** 2 - 1;
+
+const functions = {
+  cubic: {
+    f: x => x ** 3 - x,
+    df: x => 3 * x ** 2 - 1
+  },
+  sine: {
+    f: x => 10*Math.sin(x),
+    df: x => 10*Math.cos(x)
+  },
+  cosx2: {
+    f: x => 10*Math.cos(x ** 2),
+    df: x => -20 * x * Math.sin(x ** 2)
+  },
+  gaussianSine: {
+    f: x => 10*Math.exp(-(x ** 2)) * Math.sin(2 * x),
+    df: x => 10*Math.exp(-(x ** 2)) * (2 * Math.cos(2 * x) - 2 * x * Math.sin(2 * x))
+  }
+};
+
+let xMin = -3, xMax = 3, yMin = -11, yMax = 11;
+let pointA = { x: -1 }, pointB = { x: 1 };
+let draggingA = false, draggingB = false;
+const radius = 8;
+
+function setup() {
+  createCanvas(800, 600);
+  textSize(12);
+
+  const select = document.getElementById("funcSelect");
+  const selected = select.value;
+  f = functions[selected].f;
+  df = functions[selected].df;
+
+  select.addEventListener("change", e => {
+    const selected = e.target.value;
+    f = functions[selected].f;
+    df = functions[selected].df;
+  });
+}
+
+function draw() {
+  background(255);
+  drawAxes();
+
+  const ax = graphToScreenX(pointA.x);
+  const ay = graphToScreenY(f(pointA.x));
+  const bx = graphToScreenX(pointB.x);
+  const by = graphToScreenY(f(pointB.x));
+
+  // Curve
+  noFill();
+  stroke(0);
+  beginShape();
+  for (let x = xMin; x <= xMax; x += 0.01) {
+    const y = f(x);
+    if (isFinite(y)) {
+      vertex(graphToScreenX(x), graphToScreenY(y));
+    }
+  }
+  endShape();
+
+  // Secant line
+  const mSecant = (f(pointB.x) - f(pointA.x)) / (pointB.x - pointA.x);
+  stroke(0, 0, 255);
+  line(ax, ay, bx, by);
+
+  // MVT point
+  const c = findMVTPointNumerical(pointA.x, pointB.x, mSecant);
+  const fc = f(c);
+  const cx = graphToScreenX(c);
+  const cy = graphToScreenY(fc);
+
+  // Tangent line at c using actual derivative
+  stroke(255, 0, 0);
+  const slopeAtC = df(c);
+  const dx = 0.75;
+  line(graphToScreenX(c - dx), graphToScreenY(fc - slopeAtC * dx),
+       graphToScreenX(c + dx), graphToScreenY(fc + slopeAtC * dx));
+
+  // Points
+  noStroke();
+  fill(0);
+  ellipse(ax, ay, radius);
+  ellipse(bx, by, radius);
+  fill(255, 0, 0);
+  ellipse(cx, cy, radius * 1.2);
+
+  drawLabel(ax, ay, `A (${pointA.x.toFixed(2)}, ${f(pointA.x).toFixed(2)})`);
+  drawLabel(bx, by, `B (${pointB.x.toFixed(2)}, ${f(pointB.x).toFixed(2)})`);
+  drawLabel(cx, cy, `c ≈ ${c.toFixed(2)}`);
+
+  fill(0);
+  textAlign(LEFT);
+  text(`Slope = ${mSecant.toFixed(2)}`, 10, 20);
+}
+
+function drawAxes() {
+  stroke(180);
+  const zeroX = graphToScreenX(0);
+  const zeroY = graphToScreenY(0);
+
+  line(graphToScreenX(xMin), zeroY, graphToScreenX(xMax), zeroY);
+  line(zeroX, graphToScreenY(yMin), zeroX, graphToScreenY(yMax));
+
+  push();
+  fill(0);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  for (let i = Math.ceil(xMin); i <= Math.floor(xMax); i++) {
+    let x = graphToScreenX(i);
+    text(i, x, zeroY + 15);
+    stroke(200);
+    line(x, zeroY - 5, x, zeroY + 5);
+  }
+  for (let j = Math.ceil(yMin); j <= Math.floor(yMax); j++) {
+    let y = graphToScreenY(j);
+    text(j, zeroX - 20, y);
+    stroke(200);
+    line(zeroX - 5, y, zeroX + 5, y);
+  }
+  text("x", width - 20, zeroY - 10);
+  text("y", zeroX + 10, 10);
+  pop();
+}
+
+function drawLabel(x, y, txt) {
+  push();
+  fill(0);
+  textAlign(LEFT, BOTTOM);
+  text(txt, x + 5, y - 5);
+  pop();
+}
+
+function graphToScreenX(x) {
+  return map(x, xMin, xMax, 0, width);
+}
+
+function graphToScreenY(y) {
+  return map(y, yMin, yMax, height, 0);
+}
+
+function screenToGraphX(x) {
+  return map(x, 0, width, xMin, xMax);
+}
+
+function mousePressed() {
+  const mx = mouseX;
+  const my = mouseY;
+  const ax = graphToScreenX(pointA.x);
+  const ay = graphToScreenY(f(pointA.x));
+  const bx = graphToScreenX(pointB.x);
+  const by = graphToScreenY(f(pointB.x));
+  if (dist(mx, my, ax, ay) < radius) draggingA = true;
+  if (dist(mx, my, bx, by) < radius) draggingB = true;
+}
+
+function mouseDragged() {
+  const gx = screenToGraphX(constrain(mouseX, 0, width));
+  const fy = f(gx);
+  const sy = graphToScreenY(fy);
+
+  if (sy >= 0 && sy <= height) {
+    if (draggingA) pointA.x = constrain(gx, xMin, pointB.x - 0.1);
+    if (draggingB) pointB.x = constrain(gx, pointA.x + 0.1, xMax);
+  }
+}
+
+function mouseReleased() {
+  draggingA = false;
+  draggingB = false;
+}
+
+function findMVTPointNumerical(a, b, targetSlope) {
+  const EPS = 1e-6;
+  const N = 1000; // number of sampling steps
+  const fPrimeMinusTarget = x => df(x) - targetSlope;
+  const candidates = [];
+
+  const dx = (b - a) / N;
+  for (let i = 0; i < N; i++) {
+    const x1 = a + i * dx;
+    const x2 = x1 + dx;
+    const y1 = fPrimeMinusTarget(x1);
+    const y2 = fPrimeMinusTarget(x2);
+    if (y1 * y2 < 0) {
+      // Root exists in [x1, x2], apply bisection
+      let left = x1, right = x2;
+      for (let j = 0; j < 50; j++) {
+        const mid = (left + right) / 2;
+        const fmid = fPrimeMinusTarget(mid);
+        if (Math.abs(fmid) < EPS) {
+          candidates.push(mid);
+          break;
+        }
+        if (fPrimeMinusTarget(left) * fmid < 0) right = mid;
+        else left = mid;
+      }
+    }
+  }
+
+  if (candidates.length === 0) {
+    // fallback: return midpoint, warn in console
+    console.warn("No root found for f'(c) = secant slope");
+    return (a + b) / 2;
+  }
+
+  // Return the one closest to the center of [a, b]
+  const mid = (a + b) / 2;
+  return candidates.reduce((best, c) =>
+    Math.abs(c - mid) < Math.abs(best - mid) ? c : best
+  );
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Function Composition Puzzle Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 {
+            margin-top: 24px;
+            color: #333;
+        }
+        #container {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 24px 32px 32px 32px;
+            margin: 32px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 800px;
+            width: 100%;
+        }
+        .difficulty-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .difficulty-btn {
+            padding: 8px 16px;
+            border: 2px solid #007bff;
+            background: white;
+            color: #007bff;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .difficulty-btn:hover {
+            background: #007bff;
+            color: white;
+        }
+        .difficulty-btn.active {
+            background: #007bff;
+            color: white;
+        }
+        .puzzle-info {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 16px;
+            color: #333;
+        }
+        .input-output {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        .input-output span {
+            background: #f1f3f4;
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .functions-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        .function-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .function-card:hover {
+            border-color: #007bff;
+            background: #f0f8ff;
+        }
+        .function-card.selected {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        .function-card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .function-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .function-formula {
+            font-family: 'Courier New', monospace;
+            color: #666;
+        }
+        .composition-sequence {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+            min-height: 80px;
+            flex-wrap: wrap;
+        }
+        .sequence-slot {
+            width: 80px;
+            height: 60px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fafafa;
+            font-size: 14px;
+            color: #999;
+            transition: all 0.2s;
+        }
+        .sequence-slot.filled {
+            border-color: #007bff;
+            background: #e3f2fd;
+            cursor: pointer;
+        }
+        .sequence-slot.filled:hover {
+            background: #d1ecf1;
+            border-color: #0056b3;
+        }
+        .function-expression {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .sequence-slot.drag-over {
+            border-color: #28a745;
+            background: #d4edda;
+            transform: scale(1.05);
+        }
+        .arrow {
+            font-size: 18px;
+            color: #666;
+        }
+        .function-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: grab;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .function-card:hover {
+            border-color: #007bff;
+            background: #f0f8ff;
+        }
+        .function-card.selected {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        .function-card.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+            cursor: grabbing;
+        }
+        .function-card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .btn {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .btn.secondary {
+            background: #6c757d;
+        }
+        .btn.secondary:hover {
+            background: #495057;
+        }
+        #result {
+            text-align: center;
+            font-size: 16px;
+            margin-top: 15px;
+            min-height: 1.5em;
+        }
+        .score-display {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+        .explanation {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 0 5px 5px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Function Composition Puzzle Game</h1>
+    <div id="container">
+        <div class="difficulty-selector">
+            <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+            <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+        </div>
+        
+        <div class="score-display">
+            Score: <span id="score">0</span> | Puzzles Solved: <span id="puzzles-solved">0</span>
+        </div>
+        
+        <div class="puzzle-info" id="puzzle-info">
+            Find the function that transforms the input to the output.
+        </div>
+        
+        <div class="input-output">
+            <span>Input: <span id="input-value">3</span></span>
+            <span>→</span>
+            <span>Output: <span id="output-value">9</span></span>
+        </div>
+        
+        <div class="functions-container" id="functions-container">
+            <!-- Functions will be populated here -->
+        </div>
+        
+        <div class="composition-sequence" id="composition-sequence">
+            <!-- Sequence slots will be populated here -->
+        </div>
+        
+        <div class="buttons">
+            <button class="btn" id="submit-btn">Submit</button>
+            <button class="btn secondary" id="new-puzzle-btn">New Puzzle</button>
+            <button class="btn secondary" id="reveal-btn">Reveal Answer</button>
+        </div>
+        
+        <div id="result"></div>
+        
+        <div class="explanation" id="explanation"></div>
+    </div>
+
+    <script>
+        // Game state
+        let currentDifficulty = 'easy';
+        let score = 0;
+        let puzzlesSolved = 0;
+        let currentPuzzle = null;
+        let selectedFunctions = [];
+        let availableFunctions = [];
+
+        // Complete function library
+        const allFunctions = {
+            f: { name: 'f', formula: 'f(x) = x²', expression: 'x²', func: x => x * x },
+            g: { name: 'g', formula: 'g(x) = 2x + 1', expression: '2x + 1', func: x => 2 * x + 1 },
+            h: { name: 'h', formula: 'h(x) = 2^x', expression: '2^x', func: x => Math.pow(2, x) },
+            i: { name: 'i', formula: 'i(x) = x + 3', expression: 'x + 3', func: x => x + 3 },
+            j: { name: 'j', formula: 'j(x) = 3x', expression: '3x', func: x => 3 * x },
+            k: { name: 'k', formula: 'k(x) = x - 2', expression: 'x - 2', func: x => x - 2 },
+            l: { name: 'l', formula: 'l(x) = x/2', expression: 'x/2', func: x => x / 2 },
+            m: { name: 'm', formula: 'm(x) = x² + 1', expression: 'x² + 1', func: x => x * x + 1 },
+            n: { name: 'n', formula: 'n(x) = |x|', expression: '|x|', func: x => Math.abs(x) },
+            o: { name: 'o', formula: 'o(x) = -x', expression: '-x', func: x => -x }
+        };
+        
+        // Current round's function library (will be randomized)
+        let functionLibrary = {};
+
+        // Difficulty configurations
+        const difficultyConfig = {
+            easy: {
+                numFunctions: 1,
+                description: "Find the function that transforms the input to the output."
+            },
+            medium: {
+                numFunctions: 2,
+                description: "Find the two functions and their order that transform the input to the output."
+            },
+            hard: {
+                numFunctions: 3,
+                description: "Find the three functions and their order that transform the input to the output."
+            }
+        };
+        
+        function randomizeFunctionLibrary() {
+            // Select 3 random functions from the complete library
+            const allFunctionKeys = Object.keys(allFunctions);
+            const shuffled = allFunctionKeys.sort(() => Math.random() - 0.5);
+            const selectedFunctions = shuffled.slice(0, 3);
+            
+            // Create new function library where f, g, h are mapped to random functions
+            functionLibrary = {
+                f: {
+                    name: 'f',
+                    formula: `f(x) = ${allFunctions[selectedFunctions[0]].expression}`,
+                    expression: allFunctions[selectedFunctions[0]].expression,
+                    func: allFunctions[selectedFunctions[0]].func
+                },
+                g: {
+                    name: 'g',
+                    formula: `g(x) = ${allFunctions[selectedFunctions[1]].expression}`,
+                    expression: allFunctions[selectedFunctions[1]].expression,
+                    func: allFunctions[selectedFunctions[1]].func
+                },
+                h: {
+                    name: 'h',
+                    formula: `h(x) = ${allFunctions[selectedFunctions[2]].expression}`,
+                    expression: allFunctions[selectedFunctions[2]].expression,
+                    func: allFunctions[selectedFunctions[2]].func
+                }
+            };
+            
+            return ['f', 'g', 'h'];
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('puzzles-solved').textContent = puzzlesSolved;
+        }
+
+        function setDifficulty(difficulty) {
+            currentDifficulty = difficulty;
+            
+            // Update button states
+            document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-difficulty="${difficulty}"]`).classList.add('active');
+            
+            // Update puzzle info
+            document.getElementById('puzzle-info').textContent = difficultyConfig[difficulty].description;
+            
+            // Generate new puzzle
+            generatePuzzle();
+        }
+
+        function generatePuzzle() {
+            const config = difficultyConfig[currentDifficulty];
+            const numFunctions = config.numFunctions;
+            
+            // Randomize the function library for this puzzle
+            const availableFunctions = randomizeFunctionLibrary();
+            
+            // Select random functions for this puzzle (allowing repeats)
+            const puzzleFunctions = [];
+            for (let i = 0; i < numFunctions; i++) {
+                const randomIndex = Math.floor(Math.random() * availableFunctions.length);
+                puzzleFunctions.push(availableFunctions[randomIndex]);
+            }
+            
+            // Generate random input (integer between 0 and 5)
+            const input = Math.floor(Math.random() * 6);
+            
+            // Compute the output by applying the functions in order
+            let output = input;
+            for (const funcKey of puzzleFunctions) {
+                output = functionLibrary[funcKey].func(output);
+            }
+            
+            // Ensure output is reasonable (not too large or negative)
+            if (output > 1000 || output < -1000 || !isFinite(output)) {
+                // Regenerate if output is unreasonable
+                generatePuzzle();
+                return;
+            }
+            
+            currentPuzzle = {
+                input: input,
+                output: output,
+                solution: [...puzzleFunctions]
+            };
+            
+            // Update display
+            document.getElementById('input-value').textContent = input;
+            document.getElementById('output-value').textContent = output;
+            
+            // Reset selection
+            selectedFunctions = [];
+            updateFunctionDisplay();
+            updateSequenceDisplay();
+            
+            // Clear result
+            document.getElementById('result').textContent = '';
+            document.getElementById('explanation').style.display = 'none';
+        }
+
+        function updateFunctionDisplay() {
+            const container = document.getElementById('functions-container');
+            container.innerHTML = '';
+            
+            // Always show f, g, h with their current randomized definitions
+            ['f', 'g', 'h'].forEach(funcKey => {
+                const func = functionLibrary[funcKey];
+                const card = document.createElement('div');
+                card.className = 'function-card';
+                card.dataset.function = funcKey;
+                card.draggable = true;
+                
+                card.innerHTML = `
+                    <div class="function-name">${funcKey}</div>
+                    <div class="function-formula">${func.formula}</div>
+                `;
+                
+                // Drag event listeners
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+                
+                // Click event listener
+                card.addEventListener('click', () => addFunctionByClick(funcKey));
+                
+                container.appendChild(card);
+            });
+        }
+
+        function updateSequenceDisplay() {
+            const container = document.getElementById('composition-sequence');
+            container.innerHTML = '';
+            
+            const numSlots = difficultyConfig[currentDifficulty].numFunctions;
+            
+            for (let i = 0; i < numSlots; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'sequence-slot';
+                slot.dataset.index = i;
+                
+                if (selectedFunctions[i]) {
+                    slot.innerHTML = `
+                        <div class="function-expression">${functionLibrary[selectedFunctions[i]].expression}</div>
+                    `;
+                    slot.classList.add('filled');
+                    slot.draggable = true;
+                    slot.addEventListener('dragstart', handleSlotDragStart);
+                    slot.addEventListener('dragend', handleSlotDragEnd);
+                    slot.addEventListener('click', () => removeFunctionFromSlot(i));
+                } else {
+                    slot.textContent = 'Drop here';
+                }
+                
+                // Drop event listeners
+                slot.addEventListener('dragover', handleDragOver);
+                slot.addEventListener('drop', handleDrop);
+                slot.addEventListener('dragenter', handleDragEnter);
+                slot.addEventListener('dragleave', handleDragLeave);
+                
+                container.appendChild(slot);
+                
+                if (i < numSlots - 1) {
+                    const arrow = document.createElement('span');
+                    arrow.className = 'arrow';
+                    arrow.textContent = '→';
+                    container.appendChild(arrow);
+                }
+            }
+        }
+
+        // Drag and drop handlers
+        function handleDragStart(e) {
+            e.target.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', e.target.dataset.function);
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function handleSlotDragStart(e) {
+            e.target.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', 'slot:' + e.target.dataset.index);
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleSlotDragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            e.target.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.target.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.target.classList.remove('drag-over');
+            
+            const data = e.dataTransfer.getData('text/plain');
+            const targetIndex = parseInt(e.target.dataset.index);
+            
+            if (data.startsWith('slot:')) {
+                // Moving a function from one slot to another
+                const sourceIndex = parseInt(data.split(':')[1]);
+                if (sourceIndex !== targetIndex) {
+                    const temp = selectedFunctions[sourceIndex];
+                    selectedFunctions[sourceIndex] = selectedFunctions[targetIndex];
+                    selectedFunctions[targetIndex] = temp;
+                    updateSequenceDisplay();
+                }
+            } else {
+                // Dropping a function from the function library
+                const funcKey = data;
+                // Ensure the array is long enough to accommodate the target index
+                while (selectedFunctions.length <= targetIndex) {
+                    selectedFunctions.push(null);
+                }
+                // Place the function at the specific slot
+                selectedFunctions[targetIndex] = funcKey;
+                updateSequenceDisplay();
+            }
+        }
+
+        function checkAnswer() {
+            const numRequired = difficultyConfig[currentDifficulty].numFunctions;
+            const validFunctions = selectedFunctions.filter(func => func !== null);
+            if (validFunctions.length !== numRequired) {
+                document.getElementById('result').textContent = `Please select ${numRequired} function${numRequired > 1 ? 's' : ''}.`;
+                return;
+            }
+            
+            // Compute the result by applying the selected functions in order
+            let result = currentPuzzle.input;
+            for (const funcKey of validFunctions) {
+                result = functionLibrary[funcKey].func(result);
+            }
+            
+            // Check if the computed result matches the expected output
+            const isCorrect = Math.abs(result - currentPuzzle.output) < 0.01; // Small tolerance for floating point
+            
+            if (isCorrect) {
+                score += currentDifficulty === 'easy' ? 10 : currentDifficulty === 'medium' ? 20 : 30;
+                puzzlesSolved++;
+                updateScore();
+                document.getElementById('result').textContent = 'Correct! Well done!';
+                document.getElementById('result').style.color = '#28a745';
+                showExplanation();
+            } else {
+                document.getElementById('result').textContent = `Incorrect. Your answer gives ${result}, but the output should be ${currentPuzzle.output}.`;
+                document.getElementById('result').style.color = '#dc3545';
+            }
+        }
+
+        function showExplanation() {
+            const explanation = document.getElementById('explanation');
+            let steps = `Starting with ${currentPuzzle.input}:<br>`;
+            let currentValue = currentPuzzle.input;
+            
+            const validFunctions = selectedFunctions.filter(func => func !== null);
+            validFunctions.forEach((funcKey, index) => {
+                const func = functionLibrary[funcKey];
+                const newValue = func.func(currentValue);
+                steps += `${funcKey}(${currentValue}) = ${newValue}`;
+                if (index < validFunctions.length - 1) {
+                    steps += ' → ';
+                }
+                currentValue = newValue;
+            });
+            
+            explanation.innerHTML = steps;
+            explanation.style.display = 'block';
+        }
+
+        function revealAnswer() {
+            // Find one possible correct answer by trying different combinations
+            const numRequired = difficultyConfig[currentDifficulty].numFunctions;
+            const functions = ['f', 'g', 'h'];
+            
+            // Try all possible combinations (including repeats)
+            const allCombinations = generateCombinationsWithRepeats(functions, numRequired);
+            
+            for (const combination of allCombinations) {
+                let result = currentPuzzle.input;
+                for (const funcKey of combination) {
+                    result = functionLibrary[funcKey].func(result);
+                }
+                if (Math.abs(result - currentPuzzle.output) < 0.01) {
+                    selectedFunctions = combination;
+                    updateSequenceDisplay();
+                    document.getElementById('result').textContent = `One possible answer is: ${combination.join(' → ')}`;
+                    document.getElementById('result').style.color = '#6c757d';
+                    showExplanation();
+                    return;
+                }
+            }
+            
+            document.getElementById('result').textContent = 'No solution found.';
+            document.getElementById('result').style.color = '#dc3545';
+        }
+        
+        function generateCombinationsWithRepeats(arr, length) {
+            if (length === 1) {
+                return arr.map(item => [item]);
+            }
+            
+            const combinations = [];
+            for (let i = 0; i < arr.length; i++) {
+                const subCombinations = generateCombinationsWithRepeats(arr, length - 1);
+                for (const subCombo of subCombinations) {
+                    combinations.push([arr[i], ...subCombo]);
+                }
+            }
+            return combinations;
+        }
+        
+        function generateCombinations(arr, length) {
+            if (length === 1) {
+                return arr.map(item => [item]);
+            }
+            
+            const combinations = [];
+            for (let i = 0; i < arr.length; i++) {
+                const subCombinations = generateCombinations(arr, length - 1);
+                for (const subCombo of subCombinations) {
+                    combinations.push([arr[i], ...subCombo]);
+                }
+            }
+            return combinations;
+        }
+        
+        function removeFunctionFromSlot(slotIndex) {
+            // Remove the function at the specified slot
+            selectedFunctions[slotIndex] = null;
+            updateSequenceDisplay();
+        }
+        
+        function addFunctionByClick(funcKey) {
+            const numRequired = difficultyConfig[currentDifficulty].numFunctions;
+            
+            // Find the first empty slot
+            let targetSlot = 0;
+            while (targetSlot < numRequired) {
+                if (targetSlot >= selectedFunctions.length || selectedFunctions[targetSlot] === null) {
+                    break;
+                }
+                targetSlot++;
+            }
+            
+            if (targetSlot < numRequired) {
+                // Ensure the array is long enough
+                while (selectedFunctions.length <= targetSlot) {
+                    selectedFunctions.push(null);
+                }
+                
+                // Add the function to the first available slot
+                selectedFunctions[targetSlot] = funcKey;
+                updateSequenceDisplay();
+            }
+        }
+
+        // Event listeners
+        document.querySelectorAll('.difficulty-btn').forEach(btn => {
+            btn.addEventListener('click', () => setDifficulty(btn.dataset.difficulty));
+        });
+
+        document.getElementById('submit-btn').addEventListener('click', checkAnswer);
+        document.getElementById('new-puzzle-btn').addEventListener('click', generatePuzzle);
+        document.getElementById('reveal-btn').addEventListener('click', revealAnswer);
+
+        // Initialize
+        updateScore();
+        generatePuzzle();
+    </script>
+</body>
+</html>

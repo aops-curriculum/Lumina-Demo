@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Taylor Series Visualizer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6fa;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.04);
+    }
+    
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+    
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #007bff;
+      color: white;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    
+    button:hover {
+      background: #0056b3;
+    }
+    
+    select {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      font-size: 14px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    
+    label {
+      font-weight: 500;
+      color: #333;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    
+    #poly-display {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+      margin-top: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      color: #333;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Taylor Series Visualizer</h1>
+    
+    <div class="controls">
+      <div class="control-group">
+        <label for="funcSelect">Function:</label>
+        <select id="funcSelect">
+          <option value="sin">sin(x)</option>
+          <option value="cos">cos(x)</option>
+          <option value="exp">e^x</option>
+          <option value="ln">ln(1+x)</option>
+          <option value="arctan">arctan(x)</option>
+          <option value="geom">1/(1-x)</option>
+          <option value="flat">e^(-1/x²)</option>
+        </select>
+      </div>
+      
+      <div class="control-group">
+        <label for="seriesType">Series Type:</label>
+        <select id="seriesType">
+          <option value="taylor">Taylor</option>
+          <option value="fourier">Fourier</option>
+        </select>
+      </div>
+      
+      <div class="control-group">
+        <button id="upBtn">↑ Terms</button>
+        <button id="downBtn">↓ Terms</button>
+        <button id="addTerm">Add Term</button>
+        <button id="reset">Reset</button>
+      </div>
+      
+      <div class="control-group">
+        <input type="checkbox" id="overlayCheckbox">
+        <label for="overlayCheckbox">Overlay Approximations</label>
+      </div>
+    </div>
+    
+    <div id="poly-display"></div>
+  </div>
+  <script>
+    let termCount = 1;
+    let previousCurves = [];
+    let currentFunc = 'sin';
+    let seriesType = 'taylor'; // 'taylor' or 'fourier'
+    let polyDisplay; // Global variable for the polynomial display
+
+    const minX = -10;
+    const maxX = 10;
+    const minY = -10;
+    const maxY = 10;
+    const L = Math.PI; // Period for Fourier series
+
+    // Pre-computed Fourier coefficients cache
+    let fourierCoeffsCache = {};
+
+    function factorial(n) {
+      if (n === 0) return 1;
+      let f = 1;
+      for (let i = 1; i <= n; i++) f *= i;
+      return f;
+    }
+
+    // Compute Fourier coefficients using exact antiderivatives
+    function getFourierCoeffs(func, n) {
+      const cacheKey = `${func}_${n}`;
+      if (fourierCoeffsCache[cacheKey]) {
+        return fourierCoeffsCache[cacheKey];
+      }
+      
+      let a0, an, bn;
+      
+      if (func === 'sin') {
+        if (n === 0) {
+          a0 = 0; // sin(x) is odd, so a0 = 0
+        } else if (n === 1) {
+          an = 0; // cos(nπx/L) * sin(x) is odd for n=1
+          bn = 1; // sin(πx/π) * sin(x) = sin(x) * sin(x), integral = π
+        } else {
+          an = 0; // cos(nπx/L) * sin(x) is odd for n > 1
+          bn = 0; // sin(nπx/L) * sin(x) = 0 for n > 1
+        }
+      } else if (func === 'cos') {
+        if (n === 0) {
+          a0 = 0; // cos(x) is even, but integral over [-π,π] = 0
+        } else if (n === 1) {
+          an = 1; // cos(πx/π) * cos(x) = cos(x) * cos(x), integral = π
+          bn = 0; // sin(πx/π) * cos(x) is odd
+        } else {
+          an = 0; // cos(nπx/L) * cos(x) = 0 for n > 1
+          bn = 0; // sin(nπx/L) * cos(x) is odd for n > 1
+        }
+      } else if (func === 'exp') {
+        if (n === 0) {
+          a0 = (Math.exp(L) - Math.exp(-L)) / L; // (e^π - e^(-π))/π
+        } else {
+          // For e^x * cos(nπx/L): ∫ e^x cos(nx) dx = e^x(cos(nx) + n*sin(nx))/(1+n²)
+          const denom = 1 + n * n;
+          an = (Math.exp(L) * (Math.cos(n * L) + n * Math.sin(n * L)) - 
+                Math.exp(-L) * (Math.cos(-n * L) + n * Math.sin(-n * L))) / (L * denom);
+          
+          // For e^x * sin(nπx/L): ∫ e^x sin(nx) dx = e^x(sin(nx) - n*cos(nx))/(1+n²)
+          bn = (Math.exp(L) * (Math.sin(n * L) - n * Math.cos(n * L)) - 
+                Math.exp(-L) * (Math.sin(-n * L) - n * Math.cos(-n * L))) / (L * denom);
+        }
+      } else if (func === 'arctan') {
+        if (n === 0) {
+          a0 = 0; // arctan(x) is odd, so a0 = 0
+        } else {
+          // For arctan(x) * cos(nπx/L): ∫ arctan(x) cos(nx) dx
+          // Using integration by parts: u = arctan(x), dv = cos(nx)dx
+          // ∫ arctan(x) cos(nx) dx = (arctan(x) sin(nx))/n - ∫ sin(nx)/(n(1+x²)) dx
+          // The second integral can be computed numerically or using complex analysis
+          // For now, we'll compute it numerically for accuracy
+          const numPoints = 1000;
+          let anSum = 0, bnSum = 0;
+          const dx = 2 * L / numPoints;
+          
+          for (let i = 0; i < numPoints; i++) {
+            const x = -L + i * dx;
+            const arctanX = Math.atan(x);
+            anSum += arctanX * Math.cos(n * Math.PI * x / L) * dx;
+            bnSum += arctanX * Math.sin(n * Math.PI * x / L) * dx;
+          }
+          
+          an = anSum / L;
+          bn = bnSum / L;
+        }
+      } else if (func === 'geom') {
+        // Use smaller interval [-0.5, 0.5] for geometric series to avoid singularity
+        const smallL = 0.5;
+        if (n === 0) {
+          a0 = Math.log((1 + smallL) / (1 - smallL)) / smallL; // ∫ 1/(1-x) dx = -ln(1-x)
+        } else {
+          // Compute coefficients over [-0.5, 0.5]
+          const numPoints = 1000;
+          let anSum = 0, bnSum = 0;
+          const dx = 2 * smallL / numPoints;
+          
+          for (let i = 0; i < numPoints; i++) {
+            const x = -smallL + i * dx;
+            const geomX = 1 / (1 - x);
+            anSum += geomX * Math.cos(n * Math.PI * x / smallL) * dx;
+            bnSum += geomX * Math.sin(n * Math.PI * x / smallL) * dx;
+          }
+          
+          an = anSum / smallL;
+          bn = bnSum / smallL;
+        }
+      } else if (func === 'flat') {
+        if (n === 0) {
+          // ∫ e^(-1/x²) dx over [-π,π]
+          // This function is 0 at x=0 and approaches 0 very rapidly
+          // The integral should be very small but finite
+          const numPoints = 1000;
+          let a0Sum = 0;
+          const dx = 2 * L / numPoints;
+          
+          for (let i = 0; i < numPoints; i++) {
+            const x = -L + i * dx;
+            // Skip x=0 to avoid division by zero
+            if (Math.abs(x) > 1e-10) {
+              const flatX = Math.exp(-1 / (x * x));
+              a0Sum += flatX * dx;
+            }
+          }
+          
+          a0 = a0Sum / (2 * L);
+        } else {
+          // Compute coefficients for flat function
+          const numPoints = 1000;
+          let anSum = 0, bnSum = 0;
+          const dx = 2 * L / numPoints;
+          
+          for (let i = 0; i < numPoints; i++) {
+            const x = -L + i * dx;
+            // Skip x=0 to avoid division by zero
+            if (Math.abs(x) > 1e-10) {
+              const flatX = Math.exp(-1 / (x * x));
+              anSum += flatX * Math.cos(n * Math.PI * x / L) * dx;
+              bnSum += flatX * Math.sin(n * Math.PI * x / L) * dx;
+            }
+          }
+          
+          an = anSum / L;
+          bn = bnSum / L;
+        }
+      } else if (func === 'ln') {
+        if (n === 0) {
+          a0 = 0; // ln(1+x) is not defined for x ≤ -1
+        } else {
+          an = 0; // Complex integral, approximate as 0
+          bn = 0;
+        }
+      }
+      
+      const result = { a0: a0 || 0, an: an || 0, bn: bn || 0 };
+      fourierCoeffsCache[cacheKey] = result;
+      return result;
+    }
+
+    function taylorApprox(x, func, terms) {
+      let sum = 0;
+      if (func === 'sin') {
+        for (let n = 0; n < terms; n++) {
+          let k = 2 * n + 1;
+          sum += ((-1) ** n) * (x ** k) / factorial(k);
+        }
+      } else if (func === 'cos') {
+        for (let n = 0; n < terms; n++) {
+          let k = 2 * n;
+          sum += ((-1) ** n) * (x ** k) / factorial(k);
+        }
+      } else if (func === 'exp') {
+        for (let n = 0; n < terms; n++) {
+          sum += (x ** n) / factorial(n);
+        }
+      } else if (func === 'ln') {
+        for (let n = 1; n <= terms; n++) {
+          sum += ((-1) ** (n + 1)) * (x ** n) / n;
+        }
+      } else if (func === 'geom') {
+        for (let n = 0; n < terms; n++) {
+          sum += x ** n;
+        }
+      } else if (func === 'flat') {
+        return 0; // Taylor series of this function is identically 0
+      } else if (func === 'arctan') {
+        for (let n = 0; n < terms; n++) {
+          let k = 2 * n + 1;
+          sum += ((-1) ** n) * (x ** k) / k;
+        }
+      }
+      return sum;
+    }
+
+    function fourierApprox(x, func, terms) {
+      let sum = 0;
+      
+      if (func === 'geom') {
+        // Use smaller interval [-0.5, 0.5] for geometric series
+        const smallL = 0.5;
+        
+        // Get a0 coefficient
+        const { a0 } = getFourierCoeffs(func, 0);
+        sum = a0 / 2;
+        
+        // Add cosine and sine terms
+        for (let n = 1; n <= terms; n++) {
+          const { an, bn } = getFourierCoeffs(func, n);
+          sum += an * Math.cos(n * Math.PI * x / smallL) + bn * Math.sin(n * Math.PI * x / smallL);
+        }
+      } else {
+        // Use standard interval [-π, π] for other functions
+        
+        // Get a0 coefficient
+        const { a0 } = getFourierCoeffs(func, 0);
+        sum = a0 / 2;
+        
+        // Add cosine and sine terms
+        for (let n = 1; n <= terms; n++) {
+          const { an, bn } = getFourierCoeffs(func, n);
+          sum += an * Math.cos(n * Math.PI * x / L) + bn * Math.sin(n * Math.PI * x / L);
+        }
+      }
+      
+      return sum;
+    }
+
+    function getTaylorFormula(func, terms) {
+      let termsStr = [];
+      if (func === 'flat') return "0 + 0x + 0x² + ...";
+
+      if (func === 'sin') {
+        for (let n = 0; n < terms; n++) {
+          let sign = n % 2 === 0 ? '' : '-';
+          let k = 2 * n + 1;
+          termsStr.push(`${sign}x^${k}/${factorial(k)}`);
+        }
+      } else if (func === 'cos') {
+        for (let n = 0; n < terms; n++) {
+          let sign = n % 2 === 0 ? '' : '-';
+          let k = 2 * n;
+          termsStr.push(`${sign}x^${k}/${factorial(k)}`);
+        }
+      } else if (func === 'exp') {
+        for (let n = 0; n < terms; n++) {
+          termsStr.push(`x^${n}/${factorial(n)}`);
+        }
+      } else if (func === 'ln') {
+        for (let n = 1; n <= terms; n++) {
+          let sign = n % 2 === 1 ? '' : '-';
+          termsStr.push(`${sign}x^${n}/${n}`);
+        }
+      } else if (func === 'geom') {
+        for (let n = 0; n < terms; n++) {
+          termsStr.push(`x^${n}`);
+        }
+      } else if (func === 'arctan') {
+        for (let n = 0; n < terms; n++) {
+          let sign = n % 2 === 0 ? '' : '-';
+          let k = 2 * n + 1;
+          termsStr.push(`${sign}x^${k}/${k}`);
+        }
+      }
+      return termsStr.join(' + ').replace(/\+\s*-/g, '- ');
+    }
+
+    function getFourierFormula(func, terms) {
+      if (func === 'sin') {
+        return "sin(x)"; // Exact representation
+      } else if (func === 'cos') {
+        return "cos(x)"; // Exact representation
+      }
+      
+      let { a0 } = getFourierCoeffs(func, 0);
+      let termsStr = [`${a0.toFixed(3)}/2`];
+      
+      if (func === 'geom') {
+        const smallL = 0.5;
+        for (let n = 1; n <= terms; n++) {
+          const { an, bn } = getFourierCoeffs(func, n);
+          if (Math.abs(an) > 1e-6) {
+            termsStr.push(`${an.toFixed(3)}cos(${n}πx/${smallL.toFixed(1)})`);
+          }
+          if (Math.abs(bn) > 1e-6) {
+            termsStr.push(`${bn.toFixed(3)}sin(${n}πx/${smallL.toFixed(1)})`);
+          }
+        }
+      } else {
+        for (let n = 1; n <= terms; n++) {
+          const { an, bn } = getFourierCoeffs(func, n);
+          if (Math.abs(an) > 1e-6) {
+            termsStr.push(`${an.toFixed(3)}cos(${n}πx/${L.toFixed(1)})`);
+          }
+          if (Math.abs(bn) > 1e-6) {
+            termsStr.push(`${bn.toFixed(3)}sin(${n}πx/${L.toFixed(1)})`);
+          }
+        }
+      }
+      
+      return termsStr.join(' + ');
+    }
+
+    function actualFunc(x, func) {
+      if (func === 'sin') return Math.sin(x);
+      if (func === 'cos') return Math.cos(x);
+      if (func === 'exp') return Math.exp(x);
+      if (func === 'ln') return x > -1 ? Math.log(1 + x) : NaN;
+      if (func === 'geom') return x < 1 ? 1 / (1 - x) : NaN;
+      if (func === 'flat') return x === 0 ? 0 : Math.exp(-1 / (x * x));
+      if (func === 'arctan') return Math.atan(x);
+    }
+
+    function getDegreeDisplayed(func, terms) {
+      if (seriesType === 'fourier') {
+        return terms; // Number of terms in Fourier series
+      }
+      
+      if (func === 'sin') return 2 * (terms - 1) + 1;
+      if (func === 'cos') return 2 * (terms - 1);
+      if (func === 'exp') return terms - 1;
+      if (func === 'ln') return terms;
+      if (func === 'geom') return terms - 1;
+      if (func === 'flat') return terms - 1;
+      if (func === 'arctan') return 2 * (terms - 1) + 1;
+    }
+
+    function setup() {
+      createCanvas(800, 600);
+      textSize(16);
+      
+      // Get HTML elements
+      const funcSelect = document.getElementById('funcSelect');
+      const seriesTypeSelect = document.getElementById('seriesType');
+      const upBtn = document.getElementById('upBtn');
+      const downBtn = document.getElementById('downBtn');
+      const addTermBtn = document.getElementById('addTerm');
+      const resetBtn = document.getElementById('reset');
+      const overlayCheckbox = document.getElementById('overlayCheckbox');
+      polyDisplay = document.getElementById('poly-display'); // Assign to global variable
+      
+      // Add event listeners
+      funcSelect.addEventListener('change', () => {
+        currentFunc = funcSelect.value;
+        termCount = 1;
+        previousCurves = [];
+      });
+      
+      seriesTypeSelect.addEventListener('change', () => {
+        seriesType = seriesTypeSelect.value;
+        termCount = 1;
+        previousCurves = [];
+      });
+      
+      upBtn.addEventListener('click', () => {
+        if (overlayCheckbox.checked) {
+          previousCurves.push({ termCount, func: currentFunc });
+        }
+        termCount++;
+      });
+      
+      downBtn.addEventListener('click', () => {
+        if (termCount > 1) termCount--;
+      });
+      
+      addTermBtn.addEventListener('click', () => {
+        if (overlayCheckbox.checked) {
+          previousCurves.push({ termCount, func: currentFunc });
+        }
+        termCount++;
+      });
+      
+      resetBtn.addEventListener('click', () => {
+        termCount = 1;
+        previousCurves = [];
+      });
+
+      overlayCheckbox.addEventListener('change', () => {
+        if (!overlayCheckbox.checked) {
+          previousCurves = [];
+        }
+      });
+      
+      // Initialize
+      currentFunc = funcSelect.value;
+      seriesType = seriesTypeSelect.value;
+    }
+
+    function toCanvasX(x) {
+      return map(x, minX, maxX, 0, width);
+    }
+
+    function toCanvasY(y) {
+      return map(y, minY, maxY, height, 0);
+    }
+
+    function drawAxes() {
+      stroke(0);
+      line(toCanvasX(0), 0, toCanvasX(0), height);
+      line(0, toCanvasY(0), width, toCanvasY(0));
+
+      stroke(150);
+      for (let x = Math.ceil(minX); x <= Math.floor(maxX); x++) {
+        let px = toCanvasX(x);
+        line(px, toCanvasY(0) - 5, px, toCanvasY(0) + 5);
+        if (x !== 0) {
+          noStroke(); fill(0);
+          text(x, px + 2, toCanvasY(0) + 15);
+        }
+      }
+
+      for (let y = Math.ceil(minY); y <= Math.floor(maxY); y++) {
+        let py = toCanvasY(y);
+        line(toCanvasX(0) - 5, py, toCanvasX(0) + 5, py);
+        if (y !== 0) {
+          noStroke(); fill(0);
+          text(y, toCanvasX(0) + 8, py - 2);
+        }
+      }
+    }
+
+    function drawCurve(fn, strokeCol, weight = 2, domain = [-Infinity, Infinity]) {
+      stroke(strokeCol);
+      strokeWeight(weight);
+      noFill();
+      beginShape();
+      for (let px = 0; px <= width; px++) {
+        let x = map(px, 0, width, minX, maxX);
+        if (x < domain[0] || x > domain[1]) continue;
+        let y = fn(x);
+        if (!isNaN(y) && isFinite(y)) {
+          let py = toCanvasY(y);
+          vertex(px, py);
+        }
+      }
+      endShape();
+    }
+
+    function draw() {
+      background(255);
+      drawAxes();
+
+      let domain = [-10, 10];
+      if (currentFunc === 'ln') domain = [-0.999, 10];
+
+      drawCurve(x => actualFunc(x, currentFunc), color(255, 0, 0), 2, domain);
+
+      for (let i = 0; i < previousCurves.length; i++) {
+        const { termCount: t, func } = previousCurves[i];
+        let hue = map(i, 0, previousCurves.length, 100, 200);
+        let approxFn = seriesType === 'fourier' ? 
+          x => fourierApprox(x, func, t) : 
+          x => taylorApprox(x, func, t);
+        drawCurve(approxFn, color(hue, 100, 255), 1, domain);
+      }
+
+      let currentApproxFn = seriesType === 'fourier' ? 
+        x => fourierApprox(x, currentFunc, termCount) : 
+        x => taylorApprox(x, currentFunc, termCount);
+      drawCurve(currentApproxFn, color(0, 0, 255), 3, domain);
+
+      fill(255, 255, 255, 230);
+      stroke(0);
+      rect(10, height - 90, 300, 70, 8);
+      noStroke();
+      fill(0);
+      textStyle(BOLD);
+      text(`${seriesType.charAt(0).toUpperCase() + seriesType.slice(1)} Series: ${currentFunc}(x)`, 20, height - 65);
+      textStyle(NORMAL);
+      text(`${seriesType === 'fourier' ? 'Terms' : 'Degree'}: ${getDegreeDisplayed(currentFunc, termCount)}`, 20, height - 45);
+      text(`x-range: [-10, 10]`, 20, height - 25);
+
+      let formula = seriesType === 'fourier' ? 
+        getFourierFormula(currentFunc, termCount) : 
+        getTaylorFormula(currentFunc, termCount);
+      polyDisplay.innerHTML = `P(x) ≈ ${formula}`;
+    }
+
+    function keyPressed() {
+      if (keyCode === UP_ARROW) {
+        previousCurves.push({ termCount, func: currentFunc });
+        termCount++;
+      } else if (keyCode === DOWN_ARROW) {
+        if (termCount > 1) termCount--;
+      }
+    }
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mobius Transformation Widget</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            background: #f4f6fa;
+            padding: 0;
+        }
+        .widget-container {
+            background: #fff;
+            max-width: 1100px;
+            margin: 40px auto 0 auto;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.04);
+            padding: 40px 40px 28px 40px;
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 2em;
+            letter-spacing: 0.5px;
+            color: #222;
+        }
+        .inputs {
+            margin-bottom: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 18px 24px;
+        }
+        .inputs label {
+            margin-right: 0;
+            font-weight: 500;
+            color: #333;
+        }
+        .inputs input, .inputs select {
+            width: 90px;
+            padding: 6px 10px;
+            border: 1px solid #bbb;
+            border-radius: 6px;
+            font-size: 1em;
+            background: #f8fafc;
+            margin-right: 8px;
+            transition: border 0.2s;
+        }
+        .inputs input:focus, .inputs select:focus {
+            border: 1.5px solid #0074D9;
+            outline: none;
+        }
+        .inputs button {
+            padding: 7px 18px;
+            border: none;
+            border-radius: 6px;
+            background: #0074D9;
+            color: #fff;
+            font-weight: 600;
+            font-size: 1em;
+            margin-left: 4px;
+            margin-right: 0;
+            cursor: pointer;
+            box-shadow: 0 1.5px 4px rgba(0,0,0,0.04);
+            transition: background 0.2s;
+        }
+        .inputs button:hover {
+            background: #005fa3;
+        }
+        #mobius-canvas {
+            border: 1.5px solid #b5c2d6;
+            background: #f9fbfd;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .controls {
+            margin-bottom: 10px;
+            margin-top: 10px;
+        }
+        .controls button {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #e3eaf3;
+            color: #222;
+            font-weight: 500;
+            font-size: 1em;
+            margin-right: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .controls button:hover {
+            background: #c7d6ea;
+        }
+        .step-info {
+            margin-top: 18px;
+            font-weight: bold;
+            color: #2a3a4d;
+            font-size: 1.1em;
+        }
+        #step-list {
+            margin-left: 36px;
+            min-width: 320px;
+            background: #f7fafd;
+            border-radius: 10px;
+            padding: 18px 18px 10px 18px;
+            box-shadow: 0 1.5px 4px rgba(0,0,0,0.04);
+        }
+        #mobius-formula {
+            margin-bottom: 18px;
+            font-weight: bold;
+        }
+        #mobius-warning {
+            color: #d32f2f !important;
+            background: #fff3f3;
+            border-radius: 6px;
+            padding: 7px 12px;
+            margin-bottom: 10px;
+            font-size: 1.08em;
+        }
+        @media (max-width: 900px) {
+            .widget-container { padding: 12px 2vw; }
+            #step-list { margin-left: 10px; min-width: 0; }
+            .inputs { gap: 10px 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="widget-container">
+    <h2>Mobius Transformation Visualizer</h2>
+    <div class="inputs">
+        <label>a: <input type="text" id="input-a" value="1+0i"></label>
+        <label>b: <input type="text" id="input-b" value="0+0i"></label>
+        <label>c: <input type="text" id="input-c" value="0+0i"></label>
+        <label>d: <input type="text" id="input-d" value="1+0i"></label>
+        <label>Shape:
+            <select id="shape-select">
+                <option value="circle">Circle</option>
+                <option value="square">Square</option>
+                <option value="hexagon">Hexagon</option>
+            </select>
+        </label>
+        <button id="decompose-btn">Decompose</button>
+        <button id="randomize-btn">Randomize</button>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: flex-start;">
+        <div>
+            <canvas id="mobius-canvas" width="500" height="500"></canvas>
+            <div class="controls">
+                <button id="prev-step">Previous Step</button>
+                <button id="next-step">Next Step</button>
+                <button id="reset-step">Reset</button>
+            </div>
+            <div class="step-info" id="step-info">Step: -</div>
+        </div>
+        <div id="step-list" style="margin-left: 30px; min-width: 250px;">
+            <div id="mobius-formula" style="margin-bottom: 18px; font-weight: bold;"></div>
+        </div>
+    </div>
+    </div>
+    <script src="mobius_widget.js"></script>
+</body>
+</html> 

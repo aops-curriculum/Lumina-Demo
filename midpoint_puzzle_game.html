@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midpoint Puzzle Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 {
+            margin-top: 24px;
+            color: #333;
+        }
+        #container {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 24px 32px 32px 32px;
+            margin: 32px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: 60px 120px 120px;
+            grid-template-rows: 40px 60px 60px;
+            gap: 5px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        .grid-label {
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold;
+        }
+        .grid-box {
+            display: flex; align-items: center; justify-content: center;
+            background: #f1f3f4;
+            border: 1px solid #bbb;
+            min-height: 40px;
+            min-width: 100px;
+            font-size: 1.1em;
+            border-radius: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .input-coord {
+            width: 36px;
+            font-size: 1em;
+            text-align: center;
+            margin: 0 2px;
+            border: 1px solid #bbb;
+            border-radius: 4px;
+            padding: 2px 4px;
+            box-sizing: border-box;
+        }
+        .input-coord:focus {
+            outline: 2px solid #007bff;
+        }
+        #canvas-container {
+            display: flex; justify-content: center; margin-top: 20px;
+        }
+        #plane-canvas {
+            background: #e9ecef;
+            border: 1px solid #bbb;
+            border-radius: 6px;
+        }
+        #result {
+            text-align: center; font-size: 1.1em; margin-top: 15px; min-height: 1.5em;
+        }
+        #new-puzzle-btn, #submit-btn {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 18px;
+            font-size: 1rem;
+            margin: 0 8px 20px 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #new-puzzle-btn:hover, #submit-btn:hover {
+            background: #0056b3;
+        }
+        #reveal-btn {
+            background: #6c757d;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 18px;
+            font-size: 1rem;
+            margin: 0 8px 20px 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #reveal-btn:hover {
+            background: #495057;
+        }
+    </style>
+</head>
+<body>
+    <h1>Midpoint Puzzle Game</h1>
+    <div style="max-width: 600px; text-align: center; margin-bottom: 18px; font-size: 1.08em; color: #333;">
+      In the boxes below, you are given the midpoints of segments AC, BC, and AD (labeled E, F, and G, respectively, in the coordinate plane). Find the midpoint of segment BD.
+    </div>
+    <div id="container">
+      <button id="new-puzzle-btn">New Puzzle</button>
+      <div class="grid-container">
+        <div></div>
+        <div class="grid-label">A</div>
+        <div class="grid-label">B</div>
+        <div class="grid-label">C</div>
+        <div class="grid-box" id="cell-CA"></div>
+        <div class="grid-box" id="cell-CB"></div>
+        <div class="grid-label">D</div>
+        <div class="grid-box" id="cell-DA"></div>
+        <div class="grid-box" style="flex-direction: column; align-items: center; min-width: 90px;">
+          <div style="display: flex; align-items: center; justify-content: center;">
+            H(
+            <input id="input-DB-x" class="input-coord" placeholder="x"> ,
+            <input id="input-DB-y" class="input-coord" placeholder="y">
+            )
+          </div>
+        </div>
+      </div>
+      <button id="submit-btn">Submit</button>
+      <button id="reveal-btn">Reveal Answer</button>
+      <div id="result"></div>
+      <div id="canvas-container">
+        <canvas id="plane-canvas" width="500" height="500"></canvas>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <script>
+        // Utility functions
+        function randomCoord() {
+            // Random integer between -8 and 8
+            return [Math.floor(Math.random() * 17) - 8, Math.floor(Math.random() * 17) - 8];
+        }
+        function midpoint(p1, p2) {
+            return [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+        }
+        function coordToString(pt) {
+            return `(${pt[0]}, ${pt[1]})`;
+        }
+        function parseCoord(str) {
+            // Accepts (x, y) or x, y or x y
+            let m = str.match(/\(?\s*(-?\d+)\s*,\s*(-?\d+)\s*\)?/);
+            if (!m) return null;
+            return [parseInt(m[1]), parseInt(m[2])];
+        }
+
+        // Game state
+        let points = {};
+        let showSolution = false;
+        let p5Mode = false;
+        let dragIndex = null;
+        let dragOffset = [0, 0];
+        let fixedMidpoints = {};
+
+        function newPuzzle() {
+            showSolution = false;
+            // Generate random points A, B, C, D
+            points.A = randomCoord();
+            points.B = randomCoord();
+            points.C = randomCoord();
+            points.D = randomCoord();
+            // Compute midpoints
+            points.CA = midpoint(points.A, points.C); // E
+            points.CB = midpoint(points.B, points.C); // F
+            points.DA = midpoint(points.A, points.D); // G
+            // Correct answer for H (DB): F + G - E
+            points.DB = [
+                points.CB[0] + points.DA[0] - points.CA[0],
+                points.CB[1] + points.DA[1] - points.CA[1]
+            ];
+            // Fill grid
+            document.getElementById('cell-CA').textContent = 'E' + coordToString(points.CA);
+            document.getElementById('cell-CB').textContent = 'F' + coordToString(points.CB);
+            document.getElementById('cell-DA').textContent = 'G' + coordToString(points.DA);
+            document.getElementById('input-DB-x').value = '';
+            document.getElementById('input-DB-y').value = '';
+            document.getElementById('input-DB-x').disabled = false;
+            document.getElementById('input-DB-y').disabled = false;
+            document.getElementById('result').textContent = '';
+            drawPlane();
+            document.getElementById('plane-canvas').style.display = '';
+            p5Mode = false;
+            if (window._p5Instance) {
+                window._p5Instance.remove();
+                window._p5Instance = null;
+            }
+        }
+
+        function checkAnswer() {
+            let xVal = document.getElementById('input-DB-x').value.trim();
+            let yVal = document.getElementById('input-DB-y').value.trim();
+            if (xVal === '' || yVal === '' || isNaN(xVal) || isNaN(yVal)) {
+                document.getElementById('result').textContent = 'Please enter both x and y as numbers.';
+                return;
+            }
+            let userCoord = [parseFloat(xVal), parseFloat(yVal)];
+            const tol = 0.25;
+            if (Math.abs(userCoord[0] - points.DB[0]) < tol && Math.abs(userCoord[1] - points.DB[1]) < tol) {
+                document.getElementById('result').textContent = 'Correct! Revealing all points...';
+                document.getElementById('input-DB-x').disabled = true;
+                document.getElementById('input-DB-y').disabled = true;
+                showSolution = true;
+                drawPlane();
+                enableDraggableMode();
+            } else {
+                document.getElementById('result').textContent = 'Try again!';
+            }
+        }
+
+        function drawPlane() {
+            const canvas = document.getElementById('plane-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Grid: -9 to 9, canvas 500x500, unit size so all ticks are visible
+            const gridMin = -9, gridMax = 9;
+            const unit = 25;
+            const originX = 250, originY = 250;
+            // Draw grid lines
+            ctx.save();
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            for (let i = gridMin; i <= gridMax; i++) {
+                // Vertical grid lines
+                ctx.beginPath();
+                ctx.moveTo(originX + i * unit, 0);
+                ctx.lineTo(originX + i * unit, 500);
+                ctx.stroke();
+                // Horizontal grid lines
+                ctx.beginPath();
+                ctx.moveTo(0, originY - i * unit);
+                ctx.lineTo(500, originY - i * unit);
+                ctx.stroke();
+            }
+            ctx.restore();
+            // Draw axes
+            ctx.strokeStyle = '#bbb';
+            ctx.beginPath();
+            ctx.moveTo(originX, 0); ctx.lineTo(originX, 500);
+            ctx.moveTo(0, originY); ctx.lineTo(500, originY);
+            ctx.stroke();
+            // Draw axis labels
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#444';
+            ctx.fillText('x', 485, originY + 20);
+            ctx.fillText('y', originX + 10, 20);
+            ctx.fillText('0', originX + 8, originY + 20);
+            // Draw tick labels for every integer from -9 to 9
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#666';
+            for (let i = gridMin; i <= gridMax; i++) {
+                if (i !== 0) {
+                    // x-axis ticks
+                    ctx.fillText(i, originX + i * unit, originY + 25);
+                    // y-axis ticks
+                    ctx.fillText(i, originX - 25, originY - i * unit + 3);
+                }
+            }
+            // Helper to map (x, y) to canvas
+            function map(pt) {
+                return [originX + pt[0]*unit, originY - pt[1]*unit];
+            }
+            // Draw only the three given midpoints initially, labeled E, F, G
+            if (!showSolution) {
+                drawGivenMidpoints(ctx, map);
+            } else {
+                // Draw all points, lines, and midpoints
+                drawSolutionWithMidpoints(ctx, map);
+            }
+        }
+
+        function drawGivenMidpoints(ctx, map) {
+            // E = CA, F = CB, G = DA
+            drawPointCustom(ctx, map(points.CA), 'E', '#e84393');
+            drawPointCustom(ctx, map(points.CB), 'F', '#e84393');
+            drawPointCustom(ctx, map(points.DA), 'G', '#e84393');
+            // H (DB) is to be found by the user, not shown
+        }
+
+        // Draw E, F, G, H (midpoints) in addition to A, B, C, D and lines
+        function drawSolutionWithMidpoints(ctx, map) {
+            // Draw A, B, C, D in blue
+            drawPointCustom(ctx, map(points.A), 'A', '#007bff');
+            drawPointCustom(ctx, map(points.B), 'B', '#007bff');
+            drawPointCustom(ctx, map(points.C), 'C', '#007bff');
+            drawPointCustom(ctx, map(points.D), 'D', '#007bff');
+            // Draw lines for midpoints
+            ctx.strokeStyle = '#888';
+            ctx.setLineDash([5, 5]);
+            // AC
+            let [x1, y1] = map(points.A), [x2, y2] = map(points.C);
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            // BC
+            [x1, y1] = map(points.B); [x2, y2] = map(points.C);
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            // AD
+            [x1, y1] = map(points.A); [x2, y2] = map(points.D);
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            // BD
+            [x1, y1] = map(points.B); [x2, y2] = map(points.D);
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            ctx.setLineDash([]);
+            // Draw E, F, G, H in red
+            drawPointCustom(ctx, map(points.CA), 'E', '#e84393');
+            drawPointCustom(ctx, map(points.CB), 'F', '#e84393');
+            drawPointCustom(ctx, map(points.DA), 'G', '#e84393');
+            drawPointCustom(ctx, map(points.DB), 'H', '#e84393');
+        }
+
+        function drawPointCustom(ctx, pt, label, color) {
+            ctx.beginPath();
+            ctx.arc(pt[0], pt[1], 7, 0, 2*Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.stroke();
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#222';
+            ctx.fillText(label, pt[0] + 10, pt[1] - 10);
+        }
+
+        function enableDraggableMode() {
+            p5Mode = true;
+            // Store the fixed midpoints
+            fixedMidpoints = {
+                CA: [...points.CA],
+                CB: [...points.CB],
+                DA: [...points.DA],
+                DB: [...points.DB],
+            };
+            document.getElementById('plane-canvas').style.display = 'none';
+            if (!window._p5Instance) {
+                window._p5Instance = new p5(p5Sketch, document.getElementById('canvas-container'));
+            } else {
+                window._p5Instance.redraw();
+            }
+        }
+
+        document.getElementById('new-puzzle-btn').addEventListener('click', newPuzzle);
+        document.getElementById('submit-btn').addEventListener('click', checkAnswer);
+        document.getElementById('reveal-btn').addEventListener('click', function() {
+            // Fill in the answer and reveal all points
+            document.getElementById('input-DB-x').value = points.DB[0];
+            document.getElementById('input-DB-y').value = points.DB[1];
+            document.getElementById('input-DB-x').disabled = true;
+            document.getElementById('input-DB-y').disabled = true;
+            showSolution = true;
+            document.getElementById('result').textContent = `The answer is (${points.DB[0]}, ${points.DB[1]})`;
+            drawPlane();
+            enableDraggableMode();
+        });
+        document.getElementById('input-DB-x').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') checkAnswer();
+        });
+        document.getElementById('input-DB-y').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') checkAnswer();
+        });
+        // Start with a puzzle
+        newPuzzle();
+
+        // --- p5.js sketch for draggable mode ---
+        function p5Sketch(p) {
+            let unit = 25, originX = 250, originY = 250;
+            let ptNames = ['A', 'B', 'C', 'D'];
+            p.setup = function() {
+                p.createCanvas(500, 500);
+                p.noLoop();
+            };
+            p.draw = function() {
+                p.clear();
+                // Draw grid
+                p.stroke('#e0e0e0');
+                p.strokeWeight(1);
+                for (let i = -9; i <= 9; i++) {
+                    p.line(originX + i * unit, 0, originX + i * unit, 500);
+                    p.line(0, originY - i * unit, 500, originY - i * unit);
+                }
+                // Axes
+                p.stroke('#bbb');
+                p.line(originX, 0, originX, 500);
+                p.line(0, originY, 500, originY);
+                // Axis labels
+                p.noStroke();
+                p.fill('#444');
+                p.textSize(14);
+                p.text('x', 485, originY + 20);
+                p.text('y', originX + 10, 20);
+                p.text('0', originX + 8, originY + 20);
+                p.textSize(12);
+                p.fill('#666');
+                for (let i = -9; i <= 9; i++) {
+                    if (i !== 0) {
+                        p.text(i, originX + i * unit, originY + 25);
+                        p.text(i, originX - 25, originY - i * unit + 3);
+                    }
+                }
+                // Draw lines
+                p.stroke('#888');
+                p.strokeWeight(2);
+                p.drawingContext.setLineDash([5, 5]);
+                let mapped = {};
+                for (let k of ptNames) mapped[k] = [originX + points[k][0]*unit, originY - points[k][1]*unit];
+                p.line(...mapped.A, ...mapped.C);
+                p.line(...mapped.B, ...mapped.C);
+                p.line(...mapped.A, ...mapped.D);
+                p.line(...mapped.B, ...mapped.D);
+                p.drawingContext.setLineDash([]);
+                // Draw midpoints E, F, G, H
+                let mids = ['CA', 'CB', 'DA', 'DB'];
+                let midLabels = ['E', 'F', 'G', 'H'];
+                for (let i = 0; i < mids.length; i++) {
+                    let pt = [originX + fixedMidpoints[mids[i]][0]*unit, originY - fixedMidpoints[mids[i]][1]*unit];
+                    p.fill('#e84393');
+                    p.stroke('#333');
+                    p.ellipse(pt[0], pt[1], 14, 14);
+                    p.noStroke();
+                    p.fill('#222');
+                    p.textSize(14);
+                    p.text(midLabels[i], pt[0] + 10, pt[1] - 10);
+                }
+                // Draw draggable points A, B, C, D
+                for (let i = 0; i < ptNames.length; i++) {
+                    let k = ptNames[i];
+                    let pt = mapped[k];
+                    p.fill('#007bff');
+                    p.stroke('#333');
+                    p.ellipse(pt[0], pt[1], 18, 18);
+                    p.noStroke();
+                    p.fill('#222');
+                    p.textSize(14);
+                    p.text(k, pt[0] + 10, pt[1] - 10);
+                }
+            };
+            function screenToCoord(x, y) {
+                return [(x - originX) / unit, (originY - y) / unit];
+            }
+            function coordToScreen(pt) {
+                return [originX + pt[0]*unit, originY - pt[1]*unit];
+            }
+            p.mousePressed = function() {
+                if (!p5Mode) return;
+                for (let i = 0; i < ptNames.length; i++) {
+                    let k = ptNames[i];
+                    let [sx, sy] = coordToScreen(points[k]);
+                    if (p.dist(p.mouseX, p.mouseY, sx, sy) < 14) {
+                        dragIndex = i;
+                        dragOffset = [points[k][0] - screenToCoord(p.mouseX, p.mouseY)[0], points[k][1] - screenToCoord(p.mouseX, p.mouseY)[1]];
+                        return;
+                    }
+                }
+            };
+            p.mouseDragged = function() {
+                if (!p5Mode || dragIndex === null) return;
+                let k = ptNames[dragIndex];
+                let [nx, ny] = screenToCoord(p.mouseX, p.mouseY);
+                nx += dragOffset[0];
+                ny += dragOffset[1];
+                // Solve for the other three points so that all four midpoints are fixed
+                // Let the dragged point be X, the others Y, Z, W
+                // The system is linear and can be solved directly
+                let X = [nx, ny];
+                let mids = fixedMidpoints;
+                let idx = dragIndex;
+                let Y, Z, W;
+                if (idx === 0) { // Dragging A
+                    // E = (A + C)/2 => C = 2E - A
+                    // G = (A + D)/2 => D = 2G - A
+                    // F = (B + C)/2 => B = 2F - C
+                    // H = (B + D)/2 => B = 2H - D
+                    let C = [2*mids.CA[0] - X[0], 2*mids.CA[1] - X[1]];
+                    let D = [2*mids.DA[0] - X[0], 2*mids.DA[1] - X[1]];
+                    // B must satisfy both:
+                    // B = 2F - C
+                    // B = 2H - D
+                    let B1 = [2*mids.CB[0] - C[0], 2*mids.CB[1] - C[1]];
+                    let B2 = [2*mids.DB[0] - D[0], 2*mids.DB[1] - D[1]];
+                    let B = [(B1[0] + B2[0])/2, (B1[1] + B2[1])/2];
+                    points.A = X; points.B = B; points.C = C; points.D = D;
+                } else if (idx === 1) { // Dragging B
+                    // F = (B + C)/2 => C = 2F - B
+                    // H = (B + D)/2 => D = 2H - B
+                    // E = (A + C)/2 => A = 2E - C
+                    // G = (A + D)/2 => A = 2G - D
+                    let C = [2*mids.CB[0] - X[0], 2*mids.CB[1] - X[1]];
+                    let D = [2*mids.DB[0] - X[0], 2*mids.DB[1] - X[1]];
+                    // A must satisfy both:
+                    // A = 2E - C
+                    // A = 2G - D
+                    let A1 = [2*mids.CA[0] - C[0], 2*mids.CA[1] - C[1]];
+                    let A2 = [2*mids.DA[0] - D[0], 2*mids.DA[1] - D[1]];
+                    let A = [(A1[0] + A2[0])/2, (A1[1] + A2[1])/2];
+                    points.B = X; points.A = A; points.C = C; points.D = D;
+                } else if (idx === 2) { // Dragging C
+                    // E = (A + C)/2 => A = 2E - C
+                    // F = (B + C)/2 => B = 2F - C
+                    // G = (A + D)/2 => D = 2G - A
+                    // H = (B + D)/2 => D = 2H - B
+                    let A = [2*mids.CA[0] - X[0], 2*mids.CA[1] - X[1]];
+                    let B = [2*mids.CB[0] - X[0], 2*mids.CB[1] - X[1]];
+                    // D must satisfy both:
+                    // D = 2G - A
+                    // D = 2H - B
+                    let D1 = [2*mids.DA[0] - A[0], 2*mids.DA[1] - A[1]];
+                    let D2 = [2*mids.DB[0] - B[0], 2*mids.DB[1] - B[1]];
+                    let D = [(D1[0] + D2[0])/2, (D1[1] + D2[1])/2];
+                    points.C = X; points.A = A; points.B = B; points.D = D;
+                } else if (idx === 3) { // Dragging D
+                    // G = (A + D)/2 => A = 2G - D
+                    // H = (B + D)/2 => B = 2H - D
+                    // E = (A + C)/2 => C = 2E - A
+                    // F = (B + C)/2 => C = 2F - B
+                    let A = [2*mids.DA[0] - X[0], 2*mids.DA[1] - X[1]];
+                    let B = [2*mids.DB[0] - X[0], 2*mids.DB[1] - X[1]];
+                    // C must satisfy both:
+                    // C = 2E - A
+                    // C = 2F - B
+                    let C1 = [2*mids.CA[0] - A[0], 2*mids.CA[1] - A[1]];
+                    let C2 = [2*mids.CB[0] - B[0], 2*mids.CB[1] - B[1]];
+                    let C = [(C1[0] + C2[0])/2, (C1[1] + C2[1])/2];
+                    points.D = X; points.A = A; points.B = B; points.C = C;
+                }
+                p.redraw();
+            };
+            p.mouseReleased = function() {
+                dragIndex = null;
+            };
+        }
+    </script>
+</body>
+</html> 

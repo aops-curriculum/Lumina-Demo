@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Interval Notation Visualizer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6fa;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.04);
+    }
+    
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    
+    #controls {
+      padding: 10px 0;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    
+    input[type="text"] {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      font-size: 16px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-width: 150px;
+    }
+    
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #007bff;
+      color: white;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 16px;
+    }
+    
+    button:hover {
+      background: #0056b3;
+    }
+    
+    #canvas-container {
+      text-align: center;
+    }
+    
+    canvas {
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Interval Notation Visualizer</h1>
+    
+    <div id="controls">
+      Enter interval (e.g., (-3, 5]): 
+      <input id="intervalInput" type="text" value="(-3, 5)">
+      <button id="drawButton">Draw</button>
+    </div>
+    
+    <div id="canvas-container"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
+  <script>
+    const app = new PIXI.Application({ width: 800, height: 200, backgroundColor: 0xffffff });
+    document.getElementById('canvas-container').appendChild(app.view);
+
+    const LINE_Y = 100;
+    const PADDING = 50;
+    const RANGE = { min: -10, max: 10 };
+    const TICK_SPACING = (app.screen.width - 2 * PADDING) / (RANGE.max - RANGE.min);
+
+    const numberLine = new PIXI.Graphics();
+    const labelsContainer = new PIXI.Container();
+    const intervalGraphics = new PIXI.Graphics();
+
+    app.stage.addChild(numberLine);
+    app.stage.addChild(intervalGraphics);
+    app.stage.addChild(labelsContainer);
+
+    function drawNumberLine() {
+      numberLine.clear();
+      labelsContainer.removeChildren();
+
+      numberLine.lineStyle(2, 0x000000);
+      numberLine.moveTo(PADDING, LINE_Y);
+      numberLine.lineTo(app.screen.width - PADDING, LINE_Y);
+
+      for (let i = RANGE.min; i <= RANGE.max; i++) {
+        const x = PADDING + (i - RANGE.min) * TICK_SPACING;
+        numberLine.moveTo(x, LINE_Y - 5);
+        numberLine.lineTo(x, LINE_Y + 5);
+
+        const label = new PIXI.Text(i.toString(), { fontSize: 12, fill: 0x000000 });
+        label.anchor.set(0.5, 0);
+        label.x = x;
+        label.y = LINE_Y + 8;
+        labelsContainer.addChild(label);
+      }
+    }
+
+    function parseInterval(input) {
+      const regex = /^(\(|\[)\s*(-?\d+)\s*,\s*(-?\d+)\s*(\)|\])$/;
+      const match = input.trim().match(regex);
+      if (!match) return null;
+      const [, leftBracket, start, end, rightBracket] = match;
+      return {
+        start: parseFloat(start),
+        end: parseFloat(end),
+        inclusiveStart: leftBracket === "[",
+        inclusiveEnd: rightBracket === "]"
+      };
+    }
+
+    function drawInterval() {
+      intervalGraphics.clear();
+
+      const input = document.getElementById("intervalInput").value;
+      const parsed = parseInterval(input);
+      if (!parsed) {
+        alert("Invalid interval format. Use formats like (a, b] or [-5, 3).");
+        return;
+      }
+
+      const { start, end, inclusiveStart, inclusiveEnd } = parsed;
+      if (start < RANGE.min || end > RANGE.max || start >= end) {
+        alert("Interval out of bounds or invalid.");
+        return;
+      }
+
+      const xStart = PADDING + (start - RANGE.min) * TICK_SPACING;
+      const xEnd = PADDING + (end - RANGE.min) * TICK_SPACING;
+
+      intervalGraphics.lineStyle(4, 0x00aaff);
+      intervalGraphics.moveTo(xStart, LINE_Y);
+      intervalGraphics.lineTo(xEnd, LINE_Y);
+
+      intervalGraphics.beginFill(inclusiveStart ? 0x00aaff : 0xffffff);
+      intervalGraphics.lineStyle(2, 0x00aaff);
+      intervalGraphics.drawCircle(xStart, LINE_Y, 6);
+      intervalGraphics.endFill();
+
+      intervalGraphics.beginFill(inclusiveEnd ? 0x00aaff : 0xffffff);
+      intervalGraphics.lineStyle(2, 0x00aaff);
+      intervalGraphics.drawCircle(xEnd, LINE_Y, 6);
+      intervalGraphics.endFill();
+    }
+
+    drawNumberLine();
+    document.getElementById("drawButton").addEventListener("click", drawInterval);
+  </script>
+</body>
+</html>

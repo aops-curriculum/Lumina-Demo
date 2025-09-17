@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Euler's Method Visualizer - Bernoulli ODE</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6fa;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.04);
+    }
+    
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Euler's Method Visualizer</h1>
+    <main></main>
+  </div>
+
+  <script>
+    let points = [];
+    const xEnd = 10;
+    let numSteps = 1;
+    let y0 = 1;
+    let showActual = false;
+    let showSlopeField = false;
+    
+    // Layout constants
+    const chartBottomOffset = 220;  // space reserved for UI at bottom
+
+    // UI elements (x, y positions will be relative to canvas height later)
+    let y0Slider = { x: 50, y: 0, width: 300, height: 25, min: 0.5, max: 1, value: 1 };
+    let stepSlider = { x: 50, y: 0, width: 300, height: 25, min: 1, max: 50, value: 1 };
+    let actualCheckbox = { x: 450, y: 0, width: 25, height: 25, checked: false };
+    let slopeFieldCheckbox = { x: 450, y: 0, width: 25, height: 25, checked: false };
+    let dragging = null;
+
+    function setup() {
+      createCanvas(700, 650);
+
+      // Now that we know canvas height, set UI y-positions
+      y0Slider.y   = height - 180;
+      stepSlider.y = height - 120;
+      actualCheckbox.y = height - 180;
+      slopeFieldCheckbox.y = height - 140;
+      updatePoints();
+    }
+
+    function draw() {
+      background(255);
+
+      // Title
+      textSize(16);
+      textAlign(CENTER);
+      fill(0);
+      text("Differential Equation: y' = y² - y", width / 2, 30);
+
+      drawAxes();
+      if (showActual) {
+        drawActualSolution();
+        drawExactFormula();
+      }
+      if (showSlopeField) {
+        drawSlopeField();
+      }
+      drawEulerCurve();
+      drawUI();
+    }
+
+    function drawAxes() {
+      stroke(0);
+      line(50, chartBottom(), width - 20, chartBottom()); // x-axis
+      line(50, 30, 50, chartBottom()); // y-axis
+
+      fill(0);
+      textSize(12);
+      text("x", width - 20, chartBottom() - 5);
+      text("y", 40, 40);
+
+      // x-axis ticks
+      for (let i = 0; i <= 10; i++) {
+        let xVal = i;
+        let x = map(xVal, 0, 10, 50, width - 50);
+        line(x, chartBottom() - 5, x, chartBottom() + 5);
+        textAlign(CENTER);
+        text(xVal.toFixed(1), x, chartBottom() - 20);
+      }
+
+      // y-axis ticks: from 0 to 1
+      for (let yVal = 0; yVal <= 1; yVal += 0.1) {
+        let y = map(yVal, 0, 1, chartBottom(), 50);
+        line(45, y, 55, y);
+        textAlign(RIGHT, CENTER);
+        text(yVal.toFixed(1), 40, y);
+      }
+    }
+
+    function drawEulerCurve() {
+      stroke(0, 0, 255);
+      noFill();
+      beginShape();
+      for (let pt of points) {
+        let x = map(pt.x, 0, 10, 50, width - 50);
+        let y = map(pt.y, 0, 1, chartBottom(), 50);
+        vertex(x, y);
+      }
+      endShape();
+
+      fill(255, 0, 0);
+      noStroke();
+      for (let pt of points) {
+        let x = map(pt.x, 0, 10, 50, width - 50);
+        let y = map(pt.y, 0, 1, chartBottom(), 50);
+        circle(x, y, 4);
+      }
+    }
+
+    function drawActualSolution() {
+      stroke(100, 200, 100);
+      noFill();
+      beginShape();
+      for (let x = 0.01; x <= xEnd; x += 0.01) {
+        let y = exactSolution(x);
+        let px = map(x, 0, 10, 50, width - 50);
+        let py = map(y, 0, 1, chartBottom(), 50);
+        vertex(px, py);
+      }
+      endShape();
+    }
+
+    function drawExactFormula() {
+      let C = ((1 - y0) / y0).toFixed(2);
+      fill(0);
+      textSize(14);
+      textAlign(CENTER);
+      text(`y(x) = 1 / [1 + ${C}·e^(x)]`, width / 2, 60);
+    }
+
+    function exactSolution(x) {
+      let C = (1 - y0) / y0;
+      return 1 / (1 + C * Math.exp(x));
+    }
+
+    function drawInfo() {
+      fill(60);
+      textSize(14);
+      textAlign(RIGHT);
+      let last = points[points.length - 1];
+      if (last) {
+        // Show approximation value
+        text(`Approx y(${xEnd.toFixed(1)}) ≈ ${last.y.toFixed(5)}`, width - 20, height - 30);
+        
+        // Show error if actual solution is displayed
+        if (showActual) {
+          let exactValue = exactSolution(xEnd);
+          let error = Math.abs(last.y - exactValue);
+          text(`Error: ${error.toFixed(5)}`, width - 20, height - 50);
+        }
+      }
+    }
+
+    function drawUI() {
+      // Background for UI area
+      fill(250);
+      noStroke();
+      rect(0, chartBottom() + 20, width, height - chartBottom() - 20);
+      
+      // y0 slider
+      drawSlider(y0Slider, y0, "Initial Condition:", `y(0) = ${y0.toFixed(2)}`);
+      
+      // step slider  
+      drawSlider(stepSlider, numSteps, "Step count:", `Steps: ${numSteps}`);
+
+      // checkbox
+      drawCheckbox(actualCheckbox, showActual, "Show actual solution");
+      
+      // slope field checkbox
+      drawCheckbox(slopeFieldCheckbox, showSlopeField, "Show slope field");
+      
+      // Draw info text on top of gray background
+      drawInfo();
+    }
+
+    function drawSlider(slider, value, label, valueText) {
+      // Label
+      fill(60);
+      textAlign(LEFT);
+      textSize(16);
+      text(label, slider.x, slider.y - 10);
+      
+      // Calculate handle position
+      let handlePos = map(value, slider.min, slider.max, slider.x, slider.x + slider.width);
+      
+      // Blue filled portion (left of handle)
+      fill(70, 130, 255);
+      noStroke();
+      rect(slider.x, slider.y + slider.height/4, handlePos - slider.x, slider.height/2, slider.height/4);
+      
+      // Gray unfilled portion (right of handle)
+      fill(200);
+      noStroke();
+      rect(handlePos, slider.y + slider.height/4, slider.x + slider.width - handlePos, slider.height/2, slider.height/4);
+      
+      // Slider handle (circle)
+      fill(70, 130, 255);
+      noStroke();
+      circle(handlePos, slider.y + slider.height/2, slider.height + 4);
+      
+      // Value text
+      fill(60);
+      textAlign(LEFT);
+      textSize(14);
+      text(valueText, slider.x + slider.width + 20, slider.y + slider.height/2 + 5);
+    }
+
+    function drawCheckbox(checkbox, checked, label) {
+      // Checkbox
+      fill(checked ? 80 : 240);
+      stroke(checked ? 60 : 180);
+      strokeWeight(2);
+      rect(checkbox.x, checkbox.y, checkbox.width, checkbox.height, 4);
+      
+      // Checkmark
+      if (checked) {
+        stroke(255);
+        strokeWeight(3);
+        line(checkbox.x + 6, checkbox.y + 13, checkbox.x + 10, checkbox.y + 17);
+        line(checkbox.x + 10, checkbox.y + 17, checkbox.x + 18, checkbox.y + 9);
+      }
+      
+      // Reset stroke settings to prevent affecting text
+      noStroke();
+      strokeWeight(1);
+      
+      // Label
+      fill(60);
+      textAlign(LEFT);
+      textSize(16);
+      text(label, checkbox.x + checkbox.width + 15, checkbox.y + checkbox.height/2 + 5);
+    }
+
+    function mousePressed() {
+      // Check if clicking on y0 slider
+      if (mouseX >= y0Slider.x && mouseX <= y0Slider.x + y0Slider.width &&
+          mouseY >= y0Slider.y && mouseY <= y0Slider.y + y0Slider.height) {
+        dragging = 'y0';
+        updateY0FromMouse();
+      }
+      // Check if clicking on step slider
+      else if (mouseX >= stepSlider.x && mouseX <= stepSlider.x + stepSlider.width &&
+               mouseY >= stepSlider.y && mouseY <= stepSlider.y + stepSlider.height) {
+        dragging = 'step';
+        updateStepFromMouse();
+      }
+      // Check if clicking on checkbox
+      else if (mouseX >= actualCheckbox.x && mouseX <= actualCheckbox.x + actualCheckbox.width &&
+               mouseY >= actualCheckbox.y && mouseY <= actualCheckbox.y + actualCheckbox.height) {
+        showActual = !showActual;
+      }
+      // Check if clicking on slope field checkbox
+      else if (mouseX >= slopeFieldCheckbox.x && mouseX <= slopeFieldCheckbox.x + slopeFieldCheckbox.width &&
+               mouseY >= slopeFieldCheckbox.y && mouseY <= slopeFieldCheckbox.y + slopeFieldCheckbox.height) {
+        showSlopeField = !showSlopeField;
+      }
+    }
+
+    function mouseDragged() {
+      if (dragging === 'y0') {
+        updateY0FromMouse();
+      } else if (dragging === 'step') {
+        updateStepFromMouse();
+      }
+    }
+
+    function mouseReleased() {
+      dragging = null;
+    }
+
+    function updateY0FromMouse() {
+      y0 = map(mouseX, y0Slider.x, y0Slider.x + y0Slider.width, y0Slider.min, y0Slider.max);
+      y0 = constrain(y0, y0Slider.min, y0Slider.max);
+      updatePoints();
+    }
+
+    function updateStepFromMouse() {
+      numSteps = Math.round(map(mouseX, stepSlider.x, stepSlider.x + stepSlider.width, stepSlider.min, stepSlider.max));
+      numSteps = constrain(numSteps, stepSlider.min, stepSlider.max);
+      updatePoints();
+    }
+
+    function updatePoints() {
+      let h = xEnd / numSteps;
+      let x = 0;
+      let y = y0;
+      points = [{ x, y }];
+
+      for (let i = 0; i < numSteps; i++) {
+        y = y + h * dydx(x, y);
+        x = x + h;
+        points.push({ x, y });
+      }
+    }
+
+    function dydx(x, y) {
+      return y * y - y;
+    }
+
+    function drawSlopeField() {
+      stroke(150, 150, 150, 120); // Light gray with transparency
+      strokeWeight(1);
+      
+      let gridSpacing = 30; // pixels between arrows
+      let arrowLength = 12;
+      
+      for (let px = 50; px <= width - 50; px += gridSpacing) {
+        for (let py = 50; py <= chartBottom(); py += gridSpacing) {
+          // Convert pixel coordinates to mathematical coordinates
+          let x = map(px, 50, width - 50, 0, 10);
+          let y = map(py, chartBottom(), 50, 0, 1);
+          
+          // Calculate slope at this point: dy/dx = y² - y
+          let slope = dydx(x, y);
+          
+          // Create a unit step in x direction and corresponding y step
+          let stepSize = 0.5; // mathematical units
+          let dx = stepSize;
+          let dy = slope * stepSize;
+          
+          // Convert to pixel coordinates
+          let pixelX1 = map(x - dx/2, 0, 10, 50, width - 50);
+          let pixelY1 = map(y - dy/2, 0, 1, chartBottom(), 50);
+          let pixelX2 = map(x + dx/2, 0, 10, 50, width - 50);
+          let pixelY2 = map(y + dy/2, 0, 1, chartBottom(), 50);
+          
+          // Calculate arrow direction in pixel space
+          let arrowDx = pixelX2 - pixelX1;
+          let arrowDy = pixelY2 - pixelY1;
+          
+          // Normalize to desired arrow length
+          let arrowMag = Math.sqrt(arrowDx * arrowDx + arrowDy * arrowDy);
+          if (arrowMag > 0) {
+            arrowDx = (arrowDx / arrowMag) * arrowLength;
+            arrowDy = (arrowDy / arrowMag) * arrowLength;
+          }
+          
+          // Draw the slope line centered at grid point
+          line(px - arrowDx/2, py - arrowDy/2, px + arrowDx/2, py + arrowDy/2);
+          
+          // Draw small arrowhead at the end
+          let arrowSize = 3;
+          let angle = Math.atan2(arrowDy, arrowDx);
+          let ax1 = px + arrowDx/2 - arrowSize * Math.cos(angle - 0.4);
+          let ay1 = py + arrowDy/2 - arrowSize * Math.sin(angle - 0.4);
+          let ax2 = px + arrowDx/2 - arrowSize * Math.cos(angle + 0.4);
+          let ay2 = py + arrowDy/2 - arrowSize * Math.sin(angle + 0.4);
+          
+          line(px + arrowDx/2, py + arrowDy/2, ax1, ay1);
+          line(px + arrowDx/2, py + arrowDy/2, ax2, ay2);
+        }
+      }
+    }
+
+    // ================= Utility to get chart bottom y ===================
+    function chartBottom() {
+      return height - chartBottomOffset;
+    }
+  </script>
+</body>
+</html>

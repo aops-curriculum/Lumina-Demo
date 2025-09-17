@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Midpoint Recovery Interactive</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    h1 {
+      margin-top: 24px;
+      color: #333;
+    }
+    #container {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 24px 32px 32px 32px;
+      margin: 32px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #graph {
+      background: #e9ecef;
+      border: 1px solid #bbb;
+      margin-bottom: 20px;
+      border-radius: 6px;
+    }
+    .inputs {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+    .point-input {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f1f3f4;
+      padding: 10px 16px;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .point-input label {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .point-input input {
+      width: 36px;
+      margin: 0 2px;
+      text-align: center;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      padding: 2px 4px;
+    }
+    #randomize, #submit {
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 8px 18px;
+      font-size: 1rem;
+      margin: 0 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #randomize:hover, #submit:hover {
+      background: #0056b3;
+    }
+    #feedback {
+      margin-top: 16px;
+      font-size: 1.1em;
+      min-height: 1.5em;
+    }
+    .correct {
+      color: #28a745;
+      font-weight: bold;
+    }
+    .incorrect {
+      color: #dc3545;
+      font-weight: bold;
+    }
+    /* Remove spinner arrows from number inputs (for browsers that ignore type=text) */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      appearance: textfield;
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body>
+  <h1>Midpoint Recovery Challenge</h1>
+  <div style="max-width: 500px; text-align: center; margin-bottom: 10px; font-size: 1.08em; color: #333;">
+    Given that D is the midpoint of AB, E is the midpoint of BC, and F is the midpoint of AC, find the original points A, B, and C.
+  </div>
+  <div id="container">
+    <canvas id="graph" width="400" height="400"></canvas>
+    <div id="midpoint-readout" style="margin-bottom: 12px; font-size: 1.08em; color: #007bff; text-align: center;"></div>
+    <div style="margin-bottom: 10px;">
+      <button id="randomize">Randomize</button>
+    </div>
+    <form id="guess-form" autocomplete="off">
+      <div class="inputs">
+        <div class="point-input">
+          <label for="ax">A (x, y)</label>
+          <div>
+            <input type="text" id="ax" required inputmode="numeric"> ,
+            <input type="text" id="ay" required inputmode="numeric">
+          </div>
+        </div>
+        <div class="point-input">
+          <label for="bx">B (x, y)</label>
+          <div>
+            <input type="text" id="bx" required inputmode="numeric"> ,
+            <input type="text" id="by" required inputmode="numeric">
+          </div>
+        </div>
+        <div class="point-input">
+          <label for="cx">C (x, y)</label>
+          <div>
+            <input type="text" id="cx" required inputmode="numeric"> ,
+            <input type="text" id="cy" required inputmode="numeric">
+          </div>
+        </div>
+      </div>
+      <div style="text-align: center;">
+        <button type="button" id="plotA">Plot A</button>
+        <button type="button" id="plotB">Plot B</button>
+        <button type="button" id="plotC">Plot C</button>
+        <button type="submit" id="submit">Submit Guess</button>
+      </div>
+    </form>
+    <div id="feedback"></div>
+  </div>
+  <script>
+    // --- Utility functions ---
+    function midpoint(p1, p2) {
+      return [ (p1[0]+p2[0])/2, (p1[1]+p2[1])/2 ];
+    }
+    function pointsEqual(p1, p2) {
+      return p1[0] === p2[0] && p1[1] === p2[1];
+    }
+    // --- State ---
+    let A, B, C, D, E, F;
+    let studentA, studentB, studentC;
+    // --- Canvas setup ---
+    const canvas = document.getElementById('graph');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    // Center origin: grid from -5 to 5
+    const gridMin = -5, gridMax = 5;
+    const gridStep = 1;
+    // --- Coordinate transforms ---
+    function toCanvas([x, y]) {
+      // Map (gridMin,gridMin)-(gridMax,gridMax) to (30, H-30)-(W-30, 30)
+      const pad = 30;
+      const scale = (W-2*pad)/(gridMax-gridMin);
+      return [pad + (x-gridMin)*scale, H - (pad + (y-gridMin)*scale)];
+    }
+    // --- Random lattice point ---
+    function randomLatticePoint() {
+      // Avoid points too close to edge for better visuals
+      const min = -4, max = 4;
+      return [
+        Math.floor(Math.random()*(max-min+1))+min,
+        Math.floor(Math.random()*(max-min+1))+min
+      ];
+    }
+    function formatCoord(val) {
+      // Show .5 if needed, otherwise integer
+      return Number.isInteger(val) ? val : val.toFixed(1);
+    }
+    // --- Randomize problem ---
+    function randomizeProblem() {
+      // Ensure A, B, C are distinct lattice points
+      do {
+        A = randomLatticePoint();
+        B = randomLatticePoint();
+        C = randomLatticePoint();
+      } while (
+        (pointsEqual(A,B) || pointsEqual(B,C) || pointsEqual(A,C))
+      );
+      D = midpoint(A,B);
+      E = midpoint(B,C);
+      F = midpoint(A,C);
+      clearInputs();
+      draw();
+      document.getElementById('feedback').textContent = '';
+      updateMidpointReadout();
+    }
+    // --- Draw grid, points, and lines ---
+    function draw() {
+      ctx.clearRect(0,0,W,H);
+      // Draw grid
+      ctx.strokeStyle = '#bbb';
+      ctx.lineWidth = 1;
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for(let i=gridMin;i<=gridMax;i+=gridStep) {
+        // vertical
+        let [x0,y0] = toCanvas([i,gridMin]);
+        let [x1,y1] = toCanvas([i,gridMax]);
+        ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+        // Label x-axis
+        if(i !== 0) {
+          ctx.fillStyle = '#666';
+          ctx.fillText(i, x0, toCanvas([0,0])[1]+16);
+        }
+        // horizontal
+        [x0,y0] = toCanvas([gridMin,i]);
+        [x1,y1] = toCanvas([gridMax,i]);
+        ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+        // Label y-axis
+        if(i !== 0) {
+          ctx.fillStyle = '#666';
+          ctx.fillText(i, toCanvas([0,0])[0]-16, y0);
+        }
+      }
+      // Draw axes
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 2;
+      // x-axis
+      let [x0,y0] = toCanvas([gridMin,0]);
+      let [x1,y1] = toCanvas([gridMax,0]);
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+      // y-axis
+      [x0,y0] = toCanvas([0,gridMin]);
+      [x1,y1] = toCanvas([0,gridMax]);
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+      // Draw D, E, F (midpoints)
+      drawPoint(D, 'D', '#007bff');
+      drawPoint(E, 'E', '#007bff');
+      drawPoint(F, 'F', '#007bff');
+      // Draw student guesses if present
+      if(studentA) {
+        drawPoint(studentA, 'A', pointsEqual(studentA,A)?'#28a745':'#dc3545', true);
+      }
+      if(studentB) {
+        drawPoint(studentB, 'B', pointsEqual(studentB,B)?'#28a745':'#dc3545', true);
+      }
+      if(studentC) {
+        drawPoint(studentC, 'C', pointsEqual(studentC,C)?'#28a745':'#dc3545', true);
+      }
+      // Only draw triangle if all three are present
+      if(studentA && studentB && studentC) {
+        ctx.strokeStyle = '#888';
+        ctx.setLineDash([4,3]);
+        ctx.beginPath();
+        let [sx,sy] = toCanvas(studentA);
+        ctx.moveTo(sx,sy);
+        [sx,sy] = toCanvas(studentB);
+        ctx.lineTo(sx,sy);
+        [sx,sy] = toCanvas(studentC);
+        ctx.lineTo(sx,sy);
+        [sx,sy] = toCanvas(studentA);
+        ctx.lineTo(sx,sy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    function drawPoint([x,y], label, color, isGuess) {
+      const [cx,cy] = toCanvas([x,y]);
+      // Draw smaller circle
+      ctx.beginPath();
+      ctx.arc(cx,cy,6,0,2*Math.PI);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = isGuess ? 0.5 : 1.0;
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Label with name and coordinates, always visible
+      ctx.font = 'bold 14px Arial';
+      ctx.fillStyle = '#222';
+      let labelText = `${label} (${formatCoord(x)},${formatCoord(y)})`;
+      // Default label offset
+      let offsetX = 10, offsetY = -18;
+      // Adjust if near right edge
+      if (cx > W - 60) offsetX = -60;
+      // Adjust if near left edge
+      if (cx < 60) offsetX = 10;
+      // Adjust if near top
+      if (cy < 30) offsetY = 20;
+      // Adjust if near bottom
+      if (cy > H - 30) offsetY = -20;
+      ctx.fillText(labelText, cx + offsetX, cy + offsetY);
+    }
+    // --- Input handling ---
+    function clearInputs() {
+      ['ax','ay','bx','by','cx','cy'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      studentA = studentB = studentC = null;
+    }
+    function updateMidpointReadout() {
+      const dStr = `D: (${formatCoord(D[0])}, ${formatCoord(D[1])})`;
+      const eStr = `E: (${formatCoord(E[0])}, ${formatCoord(E[1])})`;
+      const fStr = `F: (${formatCoord(F[0])}, ${formatCoord(F[1])})`;
+      document.getElementById('midpoint-readout').textContent = `${dStr}   ${eStr}   ${fStr}`;
+    }
+    document.getElementById('randomize').onclick = randomizeProblem;
+    function getStudentInputs() {
+      // Returns [A, B, C] as arrays of numbers, or null if any are invalid
+      const ax = document.getElementById('ax').value.trim();
+      const ay = document.getElementById('ay').value.trim();
+      const bx = document.getElementById('bx').value.trim();
+      const by = document.getElementById('by').value.trim();
+      const cx = document.getElementById('cx').value.trim();
+      const cy = document.getElementById('cy').value.trim();
+      if ([ax, ay, bx, by, cx, cy].some(v => v === '' || isNaN(Number(v)))) {
+        return null;
+      }
+      return [
+        [parseInt(ax, 10), parseInt(ay, 10)],
+        [parseInt(bx, 10), parseInt(by, 10)],
+        [parseInt(cx, 10), parseInt(cy, 10)]
+      ];
+    }
+
+    document.getElementById('guess-form').onsubmit = function(e) {
+      e.preventDefault();
+      const guess = getStudentInputs();
+      if (!guess) {
+        document.getElementById('feedback').innerHTML = '<span class="incorrect">Please enter valid integer coordinates for all points.</span>';
+        return;
+      }
+      [studentA, studentB, studentC] = guess;
+      draw();
+      giveFeedback();
+      updateMidpointReadout();
+    };
+    function giveFeedback() {
+      let correctA = pointsEqual(studentA, A);
+      let correctB = pointsEqual(studentB, B);
+      let correctC = pointsEqual(studentC, C);
+      let msg = '';
+      if(correctA && correctB && correctC) {
+        msg = '<span class="correct">All correct! Well done!</span>';
+      } else {
+        msg = '<span class="incorrect">';
+        msg += 'A: ' + (correctA ? '✔️' : '❌') + ' ';
+        msg += 'B: ' + (correctB ? '✔️' : '❌') + ' ';
+        msg += 'C: ' + (correctC ? '✔️' : '❌');
+        msg += '</span>';
+      }
+      document.getElementById('feedback').innerHTML = msg;
+    }
+    function getSingleInput(xId, yId) {
+      const x = document.getElementById(xId).value.trim();
+      const y = document.getElementById(yId).value.trim();
+      if (x === '' || y === '' || isNaN(Number(x)) || isNaN(Number(y))) {
+        return null;
+      }
+      return [parseInt(x, 10), parseInt(y, 10)];
+    }
+
+    document.getElementById('plotA').onclick = function() {
+      const a = getSingleInput('ax', 'ay');
+      if (!a) return;
+      studentA = a;
+      // Don't clear B or C
+      draw();
+      document.getElementById('feedback').textContent = '';
+      updateMidpointReadout();
+    };
+    document.getElementById('plotB').onclick = function() {
+      const b = getSingleInput('bx', 'by');
+      if (!b) return;
+      studentB = b;
+      draw();
+      document.getElementById('feedback').textContent = '';
+      updateMidpointReadout();
+    };
+    document.getElementById('plotC').onclick = function() {
+      const c = getSingleInput('cx', 'cy');
+      if (!c) return;
+      studentC = c;
+      draw();
+      document.getElementById('feedback').textContent = '';
+      updateMidpointReadout();
+    };
+    // --- Initialize ---
+    randomizeProblem();
+    updateMidpointReadout();
+  </script>
+</body>
+</html> 
