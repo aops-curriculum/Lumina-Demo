@@ -57,8 +57,8 @@ A sample of javascript-based widgets that showcase how we can build native inter
 ### 17. **Mobius Transformation Widget** (`mobius_widget.html`)
 - **Purpose**: Visualize and experiment with Möbius (linear fractional) transformations
 
-### 18. **Orthocenter Explorer** (`orthocenter-explore.html`)
-- **Purpose**: Vary vertices of a triangle to readily see how certain data changes in response.
+### 18. **Fermat Point Explorer** (`orthocenter-explore.html`)
+- **Purpose**: Vary vertices of a triangle to readily see how certain data changes in response. This may be broken - there are two different widgets: orthocenter-explorer and fermat-point, but the html seems to be crossed. 
 
 ### 19. **Funky Area Engine** (`funky-areas.html`)
 - **Purpose**: Draggable shapes to practice reorganizing components of strange shapes into something more familiar. 
