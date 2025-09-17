@@ -45,6 +45,11 @@ function draw() {
     }
   }
 
+  fill(0);            // text color
+  textAlign(CENTER);  // center horizontally
+  textSize(16);
+  text("Hold Shift to Rotate.", width / 2, height - 20);
+
 }
 function triggerConfetti() {
   confettiActive = true;
