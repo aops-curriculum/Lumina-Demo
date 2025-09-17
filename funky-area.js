@@ -44,6 +44,10 @@ function draw() {
       confettiParticles = [];
     }
   }
+  
+   textAlign(CENTER, CENTER);
+   textSize(24);
+   text("Hold Shift to Rotate", width/2, 30);
 
 }
 function triggerConfetti() {
