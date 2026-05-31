@@ -63,6 +63,9 @@ A sample of javascript-based widgets that showcase how we can build native inter
 ### 19. **Funky Area Engine** (`funky-areas.html`)
 - **Purpose**: Draggable shapes to practice reorganizing components of strange shapes into something more familiar. 
 
+### 20. **Fraction Bat** (`frac-bat.html`)
+- **Purpose**: Two-player fraction-building game with champion selection and draggable number cards. Ported from `curriculum-scriptorium/interactives/sandbox/Frac-Bat2.ts`.
+
 
 ## Author
 
