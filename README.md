@@ -66,6 +66,12 @@ A sample of javascript-based widgets that showcase how we can build native inter
 ### 20. **Fraction Bat** (`frac-bat.html`)
 - **Purpose**: Two-player fraction-building game with champion selection and draggable number cards. Ported from `curriculum-scriptorium/interactives/sandbox/Frac-Bat2.ts`.
 
+### 21. **DISTRIBUTE!** (`distribute.html`)
+- **Purpose**: Two-player card game about distributing a target number across three cards. Ported from `curriculum-scriptorium/interactives/sandbox/distribute-set-game.ts`.
+
+### 22. **Sum-It!** (`sum-it.html`)
+- **Purpose**: Single-player card game where you select subsets of face-up cards that combine with addition and subtraction to hit an increasing target. Ported from `curriculum-scriptorium/interactives/sandbox/Sum-It.ts`.
+
 
 ## Author
 
