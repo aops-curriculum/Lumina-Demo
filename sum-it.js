@@ -26,8 +26,15 @@ const RESET_BUTTON_WIDTH = 88;
 const RESET_BUTTON_HEIGHT = 32;
 const RESET_X = 640;
 const RESET_Y = 460;
+const SHOW_USED_BUTTON_WIDTH = 100;
+const SHOW_USED_BUTTON_HEIGHT = 32;
+const SHOW_USED_X = DISCARD_X;
+const SHOW_USED_Y = 160;
+const USED_CARDS_LABEL_Y = 115;
 
 let deck = [];
+let discardPile = [];
+let showUsedCards = false;
 let target = 1;
 let cardsUsed = 0;
 let gameOver = false;
@@ -75,8 +82,13 @@ function shuffle(array) {
   return out;
 }
 
-function formatCardValue(value) {
-  return value === 1 ? "A" : String(value);
+function formatUsedCardsList(values) {
+  const sorted = [...values].sort((a, b) => b - a);
+  const lines = [];
+  for (let i = 0; i < sorted.length; i += 8) {
+    lines.push(sorted.slice(i, i + 8).join(", "));
+  }
+  return lines.join("\n");
 }
 
 function allExpressionValues(nums) {
@@ -209,6 +221,7 @@ function updateShake() {
 }
 
 function handleCorrect(indices) {
+  discardPile.push(...indices.map((i) => slots[i].value));
   cardsUsed += indices.length;
   removeCardsFromSlots(indices);
   clearSelection();
@@ -262,6 +275,8 @@ function handleClaim() {
 
 function resetGame() {
   deck = shuffle(buildDeck());
+  discardPile = [];
+  showUsedCards = false;
   target = 1;
   cardsUsed = 0;
   gameOver = false;
@@ -293,6 +308,15 @@ function resetButtonBounds() {
     right: RESET_X + RESET_BUTTON_WIDTH / 2,
     bottom: RESET_Y - RESET_BUTTON_HEIGHT / 2,
     top: RESET_Y + RESET_BUTTON_HEIGHT / 2,
+  };
+}
+
+function showUsedButtonBounds() {
+  return {
+    left: SHOW_USED_X - SHOW_USED_BUTTON_WIDTH / 2,
+    right: SHOW_USED_X + SHOW_USED_BUTTON_WIDTH / 2,
+    bottom: SHOW_USED_Y - SHOW_USED_BUTTON_HEIGHT / 2,
+    top: SHOW_USED_Y + SHOW_USED_BUTTON_HEIGHT / 2,
   };
 }
 
@@ -382,7 +406,7 @@ function draw() {
   textSize(22);
   textStyle(BOLD);
   text(
-    `Target: ${target}    Cards Used: ${cardsUsed}`,
+    `Target: ${target}    Cards Used: ${cardsUsed}/${DECK_SIZE}`,
     ROW_CENTER_X,
     toCanvasY(HEADER_Y),
   );
@@ -397,7 +421,20 @@ function draw() {
   fill(30);
   textSize(16);
   textStyle(NORMAL);
-  text(`Discard\n(${cardsUsed})`, DISCARD_X, toCanvasY(DISCARD_Y + 40));
+  text(`Discard\n(${cardsUsed}/${DECK_SIZE})`, DISCARD_X, toCanvasY(DISCARD_Y + 40));
+
+  drawButton(
+    showUsedCards ? "Hide Used" : "Show Used",
+    showUsedButtonBounds(),
+    false,
+  );
+
+  if (showUsedCards && discardPile.length > 0) {
+    fill(30);
+    textSize(13);
+    textStyle(NORMAL);
+    text(formatUsedCardsList(discardPile), DISCARD_X, toCanvasY(USED_CARDS_LABEL_Y));
+  }
 
   drawButton(
     "Claim",
@@ -425,7 +462,7 @@ function draw() {
       selected ? [255, 180, 80] : [201, 236, 240],
       selected ? [200, 100, 0] : [60, 60, 60],
       selected ? 3 : 1.5,
-      formatCardValue(slot.value),
+      String(slot.value),
     );
   }
 
@@ -445,6 +482,11 @@ function mousePressed() {
 
   if (pointInRect(mx, my, resetButtonBounds())) {
     resetGame();
+    return;
+  }
+
+  if (pointInRect(mx, my, showUsedButtonBounds())) {
+    showUsedCards = !showUsedCards;
     return;
   }
 
