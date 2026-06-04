@@ -31,10 +31,31 @@ const SHOW_USED_BUTTON_HEIGHT = 32;
 const SHOW_USED_X = DISCARD_X;
 const SHOW_USED_Y = 160;
 const USED_CARDS_LABEL_Y = 115;
+const INSTRUCTIONS_BUTTON_WIDTH = 100;
+const INSTRUCTIONS_BUTTON_HEIGHT = 32;
+const INSTRUCTIONS_X = 640;
+const INSTRUCTIONS_Y = SHOW_USED_Y;
+const INSTRUCTIONS_PANEL_CX = 560;
+const INSTRUCTIONS_PANEL_CY = 90;
+const INSTRUCTIONS_PANEL_W = 310;
+const INSTRUCTIONS_PANEL_H = 104;
+
+const INSTRUCTIONS_TEXT = [
+  "How to Play",
+  "",
+  "• Five cards (values 1–10) are dealt face up from a shuffled deck of 40.",
+  "• Select a subset whose values combine with + and − (any order, parentheses allowed) to equal the Target.",
+  "• Click cards to select them, then press Claim.",
+  "• Correct claims discard those cards and deal replacements. The Target then increases by 1.",
+  "• If no subset can make the Target, the game ends. Score = (highest target completed) × (cards used).",
+  "• Sum-it! win: complete Target 10 using all 40 cards (score 400).",
+  "• You may continue past Target 10 if cards remain.",
+].join("\n");
 
 let deck = [];
 let discardPile = [];
 let showUsedCards = false;
+let showInstructions = false;
 let target = 1;
 let cardsUsed = 0;
 let gameOver = false;
@@ -250,7 +271,7 @@ function handleIncorrect(indices) {
 }
 
 function toggleSlotSelection(index) {
-  if (gameOver || won || feedbackLocked) return;
+  if (gameOver || won || feedbackLocked || showInstructions) return;
   if (slots[index].value === null) return;
 
   if (selectedSlotIndices.has(index)) {
@@ -261,7 +282,14 @@ function toggleSlotSelection(index) {
 }
 
 function handleClaim() {
-  if (gameOver || won || feedbackLocked || selectedSlotIndices.size === 0) return;
+  if (
+    gameOver ||
+    won ||
+    feedbackLocked ||
+    showInstructions ||
+    selectedSlotIndices.size === 0
+  )
+    return;
 
   const indices = [...selectedSlotIndices];
   const values = indices.map((i) => slots[i].value);
@@ -277,6 +305,7 @@ function resetGame() {
   deck = shuffle(buildDeck());
   discardPile = [];
   showUsedCards = false;
+  setShowInstructions(false);
   target = 1;
   cardsUsed = 0;
   gameOver = false;
@@ -317,6 +346,15 @@ function showUsedButtonBounds() {
     right: SHOW_USED_X + SHOW_USED_BUTTON_WIDTH / 2,
     bottom: SHOW_USED_Y - SHOW_USED_BUTTON_HEIGHT / 2,
     top: SHOW_USED_Y + SHOW_USED_BUTTON_HEIGHT / 2,
+  };
+}
+
+function instructionsButtonBounds() {
+  return {
+    left: INSTRUCTIONS_X - INSTRUCTIONS_BUTTON_WIDTH / 2,
+    right: INSTRUCTIONS_X + INSTRUCTIONS_BUTTON_WIDTH / 2,
+    bottom: INSTRUCTIONS_Y - INSTRUCTIONS_BUTTON_HEIGHT / 2,
+    top: INSTRUCTIONS_Y + INSTRUCTIONS_BUTTON_HEIGHT / 2,
   };
 }
 
@@ -390,9 +428,45 @@ function statusText() {
   return "";
 }
 
+function instructionsPanelBoundsCanvas() {
+  const cyCanvas = toCanvasY(INSTRUCTIONS_PANEL_CY);
+  return {
+    left: INSTRUCTIONS_PANEL_CX - INSTRUCTIONS_PANEL_W / 2,
+    top: cyCanvas - INSTRUCTIONS_PANEL_H / 2,
+    width: INSTRUCTIONS_PANEL_W,
+    height: INSTRUCTIONS_PANEL_H,
+  };
+}
+
+function syncInstructionsPanel() {
+  const panel = document.getElementById("instructions-panel");
+  if (!panel) {
+    return;
+  }
+
+  const bounds = instructionsPanelBoundsCanvas();
+  panel.style.left = `${bounds.left}px`;
+  panel.style.top = `${bounds.top}px`;
+  panel.style.width = `${bounds.width}px`;
+  panel.style.height = `${bounds.height}px`;
+  panel.style.display = showInstructions ? "block" : "none";
+  panel.setAttribute("aria-hidden", showInstructions ? "false" : "true");
+
+  if (showInstructions && panel.textContent !== INSTRUCTIONS_TEXT) {
+    panel.textContent = INSTRUCTIONS_TEXT;
+    panel.scrollTop = 0;
+  }
+}
+
+function setShowInstructions(next) {
+  showInstructions = next;
+  syncInstructionsPanel();
+}
+
 function setup() {
   const canvas = createCanvas(CANVAS_W, CANVAS_H);
-  canvas.parent("game-container");
+  canvas.parent("game-stage");
+  syncInstructionsPanel();
   resetGame();
 }
 
@@ -423,25 +497,12 @@ function draw() {
   textStyle(NORMAL);
   text(`Discard\n(${cardsUsed}/${DECK_SIZE})`, DISCARD_X, toCanvasY(DISCARD_Y + 40));
 
-  drawButton(
-    showUsedCards ? "Hide Used" : "Show Used",
-    showUsedButtonBounds(),
-    false,
-  );
-
   if (showUsedCards && discardPile.length > 0) {
     fill(30);
     textSize(13);
     textStyle(NORMAL);
     text(formatUsedCardsList(discardPile), DISCARD_X, toCanvasY(USED_CARDS_LABEL_Y));
   }
-
-  drawButton(
-    "Claim",
-    claimButtonBounds(),
-    gameOver || won || feedbackLocked || selectedSlotIndices.size === 0,
-  );
-  drawButton("Reset", resetButtonBounds(), false);
 
   for (const slot of slots) {
     noFill();
@@ -474,6 +535,27 @@ function draw() {
     textStyle(BOLD);
     text("✕", ROW_CENTER_X, toCanvasY(ROW_Y));
   }
+
+  drawButton(
+    "Claim",
+    claimButtonBounds(),
+    gameOver ||
+      won ||
+      feedbackLocked ||
+      showInstructions ||
+      selectedSlotIndices.size === 0,
+  );
+  drawButton("Reset", resetButtonBounds(), false);
+  drawButton(
+    showInstructions ? "Hide Rules" : "Instructions",
+    instructionsButtonBounds(),
+    false,
+  );
+  drawButton(
+    showUsedCards ? "Hide Used" : "Show Used",
+    showUsedButtonBounds(),
+    showInstructions,
+  );
 }
 
 function mousePressed() {
@@ -482,6 +564,15 @@ function mousePressed() {
 
   if (pointInRect(mx, my, resetButtonBounds())) {
     resetGame();
+    return;
+  }
+
+  if (pointInRect(mx, my, instructionsButtonBounds())) {
+    setShowInstructions(!showInstructions);
+    return;
+  }
+
+  if (showInstructions) {
     return;
   }
 
