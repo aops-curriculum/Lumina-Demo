@@ -30,7 +30,10 @@ const SHOW_USED_BUTTON_WIDTH = 100;
 const SHOW_USED_BUTTON_HEIGHT = 32;
 const SHOW_USED_X = DISCARD_X;
 const SHOW_USED_Y = 160;
-const USED_CARDS_LABEL_Y = 115;
+const USED_CARDS_PANEL_CX = SHOW_USED_X;
+const USED_CARDS_PANEL_CY = 90;
+const USED_CARDS_PANEL_W = 170;
+const USED_CARDS_PANEL_H = 104;
 const INSTRUCTIONS_BUTTON_WIDTH = 100;
 const INSTRUCTIONS_BUTTON_HEIGHT = 32;
 const INSTRUCTIONS_X = 640;
@@ -104,12 +107,101 @@ function shuffle(array) {
 }
 
 function formatUsedCardsList(values) {
-  const sorted = [...values].sort((a, b) => b - a);
-  const lines = [];
-  for (let i = 0; i < sorted.length; i += 8) {
-    lines.push(sorted.slice(i, i + 8).join(", "));
+  return [...values].sort((a, b) => b - a).join(", ");
+}
+
+function overlayPanelBoundsCanvas(cx, cy, width, height) {
+  const cyCanvas = toCanvasY(cy);
+  return {
+    left: cx - width / 2,
+    top: cyCanvas - height / 2,
+    width,
+    height,
+  };
+}
+
+function syncOverlayPanel(elementId, visible, text, resetScroll) {
+  const panel = document.getElementById(elementId);
+  if (!panel) {
+    return;
   }
-  return lines.join("\n");
+
+  panel.style.display = visible ? "block" : "none";
+  panel.setAttribute("aria-hidden", visible ? "false" : "true");
+
+  if (!visible) {
+    return;
+  }
+
+  if (panel.textContent !== text) {
+    panel.textContent = text;
+    if (resetScroll) {
+      panel.scrollTop = 0;
+    }
+  }
+}
+
+function syncUsedCardsPanel(resetScroll = false) {
+  const bounds = overlayPanelBoundsCanvas(
+    USED_CARDS_PANEL_CX,
+    USED_CARDS_PANEL_CY,
+    USED_CARDS_PANEL_W,
+    USED_CARDS_PANEL_H,
+  );
+  const panel = document.getElementById("used-cards-panel");
+  if (!panel) {
+    return;
+  }
+
+  panel.style.left = `${bounds.left}px`;
+  panel.style.top = `${bounds.top}px`;
+  panel.style.width = `${bounds.width}px`;
+  panel.style.height = `${bounds.height}px`;
+
+  const visible = showUsedCards && discardPile.length > 0;
+  syncOverlayPanel(
+    "used-cards-panel",
+    visible,
+    visible ? formatUsedCardsList(discardPile) : "",
+    resetScroll,
+  );
+}
+
+function setShowUsedCards(next) {
+  const wasOpen = showUsedCards;
+  showUsedCards = next;
+  syncUsedCardsPanel(!wasOpen && next);
+}
+
+function syncInstructionsPanel(resetScroll = false) {
+  const bounds = overlayPanelBoundsCanvas(
+    INSTRUCTIONS_PANEL_CX,
+    INSTRUCTIONS_PANEL_CY,
+    INSTRUCTIONS_PANEL_W,
+    INSTRUCTIONS_PANEL_H,
+  );
+  const panel = document.getElementById("instructions-panel");
+  if (!panel) {
+    return;
+  }
+
+  panel.style.left = `${bounds.left}px`;
+  panel.style.top = `${bounds.top}px`;
+  panel.style.width = `${bounds.width}px`;
+  panel.style.height = `${bounds.height}px`;
+
+  syncOverlayPanel(
+    "instructions-panel",
+    showInstructions,
+    showInstructions ? INSTRUCTIONS_TEXT : "",
+    resetScroll,
+  );
+}
+
+function setShowInstructions(next) {
+  const wasOpen = showInstructions;
+  showInstructions = next;
+  syncInstructionsPanel(!wasOpen && next);
 }
 
 function allExpressionValues(nums) {
@@ -255,10 +347,12 @@ function handleCorrect(indices) {
     won = true;
     score = completedTarget * cardsUsed;
     gameOver = true;
+    syncUsedCardsPanel();
     return;
   }
 
   checkBlocked();
+  syncUsedCardsPanel();
 }
 
 function handleIncorrect(indices) {
@@ -304,7 +398,7 @@ function handleClaim() {
 function resetGame() {
   deck = shuffle(buildDeck());
   discardPile = [];
-  showUsedCards = false;
+  setShowUsedCards(false);
   setShowInstructions(false);
   target = 1;
   cardsUsed = 0;
@@ -428,44 +522,10 @@ function statusText() {
   return "";
 }
 
-function instructionsPanelBoundsCanvas() {
-  const cyCanvas = toCanvasY(INSTRUCTIONS_PANEL_CY);
-  return {
-    left: INSTRUCTIONS_PANEL_CX - INSTRUCTIONS_PANEL_W / 2,
-    top: cyCanvas - INSTRUCTIONS_PANEL_H / 2,
-    width: INSTRUCTIONS_PANEL_W,
-    height: INSTRUCTIONS_PANEL_H,
-  };
-}
-
-function syncInstructionsPanel() {
-  const panel = document.getElementById("instructions-panel");
-  if (!panel) {
-    return;
-  }
-
-  const bounds = instructionsPanelBoundsCanvas();
-  panel.style.left = `${bounds.left}px`;
-  panel.style.top = `${bounds.top}px`;
-  panel.style.width = `${bounds.width}px`;
-  panel.style.height = `${bounds.height}px`;
-  panel.style.display = showInstructions ? "block" : "none";
-  panel.setAttribute("aria-hidden", showInstructions ? "false" : "true");
-
-  if (showInstructions && panel.textContent !== INSTRUCTIONS_TEXT) {
-    panel.textContent = INSTRUCTIONS_TEXT;
-    panel.scrollTop = 0;
-  }
-}
-
-function setShowInstructions(next) {
-  showInstructions = next;
-  syncInstructionsPanel();
-}
-
 function setup() {
   const canvas = createCanvas(CANVAS_W, CANVAS_H);
   canvas.parent("game-stage");
+  syncUsedCardsPanel();
   syncInstructionsPanel();
   resetGame();
 }
@@ -496,13 +556,6 @@ function draw() {
   textSize(16);
   textStyle(NORMAL);
   text(`Discard\n(${cardsUsed}/${DECK_SIZE})`, DISCARD_X, toCanvasY(DISCARD_Y + 40));
-
-  if (showUsedCards && discardPile.length > 0) {
-    fill(30);
-    textSize(13);
-    textStyle(NORMAL);
-    text(formatUsedCardsList(discardPile), DISCARD_X, toCanvasY(USED_CARDS_LABEL_Y));
-  }
 
   for (const slot of slots) {
     noFill();
@@ -577,7 +630,7 @@ function mousePressed() {
   }
 
   if (pointInRect(mx, my, showUsedButtonBounds())) {
-    showUsedCards = !showUsedCards;
+    setShowUsedCards(!showUsedCards);
     return;
   }
 

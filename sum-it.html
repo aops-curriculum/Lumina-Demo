@@ -42,7 +42,7 @@
       height: 480px;
     }
 
-    #instructions-panel {
+    .game-overlay-panel {
       position: absolute;
       display: none;
       overflow-y: auto;
@@ -61,16 +61,16 @@
       scrollbar-color: rgb(41, 93, 128) #e8eef3;
     }
 
-    #instructions-panel::-webkit-scrollbar {
+    .game-overlay-panel::-webkit-scrollbar {
       width: 8px;
     }
 
-    #instructions-panel::-webkit-scrollbar-track {
+    .game-overlay-panel::-webkit-scrollbar-track {
       background: #e8eef3;
       border-radius: 4px;
     }
 
-    #instructions-panel::-webkit-scrollbar-thumb {
+    .game-overlay-panel::-webkit-scrollbar-thumb {
       background: rgb(41, 93, 128);
       border-radius: 4px;
     }
@@ -88,7 +88,8 @@
     <h2>Sum-It!</h2>
     <div id="game-container">
       <div id="game-stage">
-        <div id="instructions-panel" aria-hidden="true"></div>
+        <div id="used-cards-panel" class="game-overlay-panel" aria-hidden="true"></div>
+        <div id="instructions-panel" class="game-overlay-panel" aria-hidden="true"></div>
       </div>
     </div>
   </div>
