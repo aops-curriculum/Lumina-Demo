@@ -72,6 +72,9 @@ A sample of javascript-based widgets that showcase how we can build native inter
 ### 22. **Sum-It!** (`sum-it.html`)
 - **Purpose**: Single-player card game where you select subsets of face-up cards that combine with addition and subtraction to hit an increasing target. Ported from `curriculum-scriptorium/interactives/sandbox/Sum-It.ts`.
 
+### 23. **Problem–Answer Match-Up** (`problem-answer-match-up.html`)
+- **Purpose**: Teacher tool that randomly assigns each student a problem number (1–16) and an answer from a different problem. Ported from `curriculum-scriptorium/interactives/sandbox/problem-answer-match-up.ts`.
+
 
 ## Author
 
